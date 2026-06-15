@@ -1,5 +1,18 @@
+# Hidden credentials
 .env
+.env.local
 
-node_modules
+#Dependency directories
+node_modules/
 
-dist
+#Build output folder
+dist/
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Operating system files
+.DS_Store
+Thumbs.db
