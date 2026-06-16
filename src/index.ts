@@ -6,6 +6,8 @@ import cors from "cors";
 import { loadEnv } from "./config/env";
 import { dbConnection } from "./db";
 import cookieParser from "cookie-parser";
+import authRoutes from "./routes/authRoutes";
+import destinationRoutes from "./routes/destinationRoutes";
 
 dotenv.config();
 
@@ -29,3 +31,6 @@ app.use(express.json());
 app.use(express.urlencoded());
 app.use(cookieParser());
 app.use("/api/public",express.static("public"));
+
+app.use("/api/auth",authRoutes);
+app.use("/api/destination",destinationRoutes);
