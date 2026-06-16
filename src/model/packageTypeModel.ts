@@ -1,19 +1,17 @@
 import mongoose, { Document } from "mongoose";
-import { DIFFICULTY_NAMES } from "../constants/difficulty";
 
 export interface IPackageType extends Document {
-  name: string; 
+  name: string;
   slug: string;
-  icon: string; 
+  icon: string;
+  themeColor: string;
   description?: string;
-  hasDifficultyLevels: boolean; 
-  order: number; 
+  hasDifficultyLevels: boolean;
+  order: number;
   isActive: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
-
-const packageDifficulty=["Beginner","Moderate","Challenging","Extreme"]
 
 const packageTypeSchema = new mongoose.Schema(
   {
@@ -28,11 +26,18 @@ const packageTypeSchema = new mongoose.Schema(
       required: true,
       lowercase: true,
       trim: true,
-      unique:true,
+      unique: true,
     },
     icon: {
       type: String,
       required: true,
+    },
+    themeColor: {
+      type: String,
+      required: true,
+      trim: true,
+      uppercase: true,
+      match: [/^#([0-9A-F]{6}|[0-9A-F]{3})$/, "Theme color must be a valid hex code (e.g. #10B981)"],
     },
     description: {
       type: String,
@@ -41,15 +46,6 @@ const packageTypeSchema = new mongoose.Schema(
     hasDifficultyLevels: {
       type: Boolean,
       default: false,
-    },
-    difficultyLevel:{
-        type:String,
-        enum:packageDifficulty,
-        required:true,
-    },
-    difficulty: {
-        type: String,
-        enum: DIFFICULTY_NAMES,
     },
     order: {
       type: Number,
