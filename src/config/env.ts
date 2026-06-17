@@ -13,6 +13,9 @@ class configModule {
     readonly ACCESS_TOKEN_SECRET:string;
     readonly REFRESH_TOKEN_SECRET:string;
     readonly ACCESS_TOKEN_EXPIRY:string;
+    readonly CLOUDINARY_CLOUD_NAME:string;
+    readonly CLOUDINARY_API_KEY:string;
+    readonly CLOUDINARY_API_SECRET:string
 
 
 
@@ -36,8 +39,12 @@ class configModule {
         this.EMAIL_USER = this.validateRequired("EMAIL_USER", process.env.EMAIL_USER);
         this.EMAIL_PASS = this.validateRequired("EMAIL_PASS", process.env.EMAIL_PASS);
         this.ADMIN_EMAIL= this.validateRequired("ADMIN_EMAIL",process.env.ADMIN_EMAIL);
-        this.ADMIN_PASSWORD= this.validateRequired("ADMIN_PASSWORD",process.env.ADMIN_PASSWORD);
+        this.ADMIN_PASSWORD = this.validateRequired("ADMIN_PASSWORD",process.env.ADMIN_PASSWORD);
         this.ADMIN_NAME= this.validateRequired("ADMIN_NAME",process.env.ADMIN_NAME);
+
+        this.CLOUDINARY_CLOUD_NAME = this.validateRequired("CLOUDINARY_CLOUD_NAME",process.env.CLOUDINARY_CLOUD_NAME);
+        this.CLOUDINARY_API_KEY = this.validateRequired("CLOUDINARY_API_KEY",process.env.CLOUDINARY_API_KEY);
+        this.CLOUDINARY_API_SECRET = this.validateRequired("CLOUDINARY_API_SECRET",process.env.CLOUDINARY_API_SECRET);
 
         // this.ACCESS_TOKEN_SECRET= this.validateRequired("ACCESS_TOKEN_SECRET",process.env.ACCESS_TOKEN_SECRET);
         // this.REFRESH_TOKEN_SECRET=this.validateRequired("REFRESH_TOKEN_SECRET",process.env.REFRESH_TOKEN_SECRET);
