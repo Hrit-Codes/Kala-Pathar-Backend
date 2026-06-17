@@ -9,6 +9,7 @@ import cookieParser from "cookie-parser";
 import authRoutes from "./routes/authRoutes";
 import destinationRoutes from "./routes/destinationRoutes";
 import packagetypeRoutes from "./routes/packageTypeRoutes";
+import companyinfoRoutes from "./routes/companyInfoRoutes";
 
 dotenv.config();
 
@@ -36,3 +37,4 @@ app.use("/api/public",express.static("public"));
 app.use("/api/auth",authRoutes);
 app.use("/api/destination",destinationRoutes);
 app.use("/api/packagetype",packagetypeRoutes);
+app.use("/api/companyinfo",companyinfoRoutes);
