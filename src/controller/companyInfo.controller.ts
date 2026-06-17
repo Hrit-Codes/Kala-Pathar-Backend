@@ -14,7 +14,7 @@ export const createCompanyInfo = asyncHandler(async (req: Request, res: Response
         throw new ApiError(400, "Logo image is required");
     }
 
-    const { companyName, officeAddress, officeTelephone, emails, phones, description, socialLinks } = req.body;
+    const { companyName, officeAddress, officeTelephone, emails, phones, description, socialLinks, mapLatitude, mapLongitude, mapEmbedUrl } = req.body;
 
     const uploadedLogo = await uploadImageToCloud(req.file, "company");
 
@@ -28,6 +28,9 @@ export const createCompanyInfo = asyncHandler(async (req: Request, res: Response
         logo: uploadedLogo.url,
         logoPublicId: uploadedLogo.publicId,
         socialLinks: typeof socialLinks === "string" ? JSON.parse(socialLinks) : socialLinks,
+        mapLatitude: Number(mapLatitude),
+        mapLongitude:Number(mapLongitude),
+        mapEmbedUrl: mapEmbedUrl?.trim(),
     });
 
     return res.status(201).json({
@@ -58,7 +61,7 @@ export const updateCompanyInfo = asyncHandler(async (req: Request, res: Response
         throw new ApiError(404, "Company info has not been set up yet. Use create instead.");
     }
 
-    const { companyName, officeAddress, officeTelephone, emails, phones, description, socialLinks } = req.body;
+    const { companyName, officeAddress, officeTelephone, emails, phones, description, socialLinks, mapLatitude, mapLongitude, mapEmbedUrl } = req.body;
 
     const updateData: any = {};
 
@@ -78,6 +81,10 @@ export const updateCompanyInfo = asyncHandler(async (req: Request, res: Response
     if (socialLinks !== undefined) {
         updateData.socialLinks = typeof socialLinks === "string" ? JSON.parse(socialLinks) : socialLinks;
     }
+
+    if (mapLatitude !==undefined) updateData.mapLatitude = Number(mapLatitude);
+    if (mapLongitude !==undefined) updateData.mapLongitude = Number (mapLongitude);
+    if (mapEmbedUrl !== undefined) updateData.mapEmbedUrl = mapEmbedUrl.trim();
 
     if (req.file) {
         const uploadedLogo = await uploadImageToCloud(req.file, "company");
