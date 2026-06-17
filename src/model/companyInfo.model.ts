@@ -19,6 +19,9 @@ export interface ICompanyInfo extends Document {
   logo?: string;
   logoPublicId:string;
   socialLinks?: ISocialLinks;
+  mapLatitude: number;
+  mapLongitude: number;
+  mapEmbedUrl?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -83,6 +86,18 @@ const companyInfoSchema = new mongoose.Schema(
     socialLinks: {
       type: socialLinksSchema,
       default: {},
+    },
+    mapLatitude: {
+        type: Number,
+        required: true,
+    },
+    mapLongitude: {
+        type: Number,
+        required: true,
+    },
+    mapEmbedUrl: {
+        type: String,
+        trim: true,
     },
   },
   {
