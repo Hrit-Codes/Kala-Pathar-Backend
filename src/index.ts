@@ -11,6 +11,7 @@ import destinationRoutes from "./routes/destinationRoutes";
 import packagetypeRoutes from "./routes/packageTypeRoutes";
 import companyinfoRoutes from "./routes/companyInfoRoutes";
 import whyChooseUsRoutes from "./routes/whyChooseUsRoutes";
+import aboutUsRoutes from "./routes/aboutUsRoutes";
 
 dotenv.config();
 
@@ -40,3 +41,4 @@ app.use("/api/destination",destinationRoutes);
 app.use("/api/packagetype",packagetypeRoutes);
 app.use("/api/companyinfo",companyinfoRoutes);
 app.use("/api/whychooseus",whyChooseUsRoutes);
+app.use("/api/aboutus",aboutUsRoutes);
