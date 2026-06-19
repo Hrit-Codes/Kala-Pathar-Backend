@@ -1,8 +1,8 @@
 import type { Request, Response } from "express";
-import { AboutUs } from "../model/aboutUs.model";
-import { ApiError } from "../utils/apiError";
+import { AboutUs, type IStat } from "../model/aboutUs.model";
 import { asyncHandler } from "../utils/asyncHandler";
 import { deleteFromCloud, uploadImageToCloud } from "../helpers/cloudinaryUpload";
+import { ApiError } from "../utils/apiError";
 
 export const createAboutUs = asyncHandler(async (req: Request, res: Response) => {
     const existing = await AboutUs.findOne();
@@ -94,14 +94,28 @@ export const updateAboutUs = asyncHandler(async (req: Request, res: Response) =>
 
     if (ceoQuote !== undefined) {
         const parsedCeoQuote = typeof ceoQuote === "string" ? JSON.parse(ceoQuote) : ceoQuote;
-        updateData.ceoQuote = { ...existing.ceoQuote, ...parsedCeoQuote };
+        const existingCeoQuotePlain = existing.ceoQuote
+            ? JSON.parse(JSON.stringify(existing.ceoQuote))
+            : {};
+        updateData.ceoQuote = { ...existingCeoQuotePlain, ...parsedCeoQuote };
     }
 
     if (stats !== undefined) {
         const parsedStats = typeof stats === "string" ? JSON.parse(stats) : stats;
 
-        if (!Array.isArray(parsedStats) || parsedStats.length !== 4) {
-            throw new ApiError(400, "Exactly 4 stats must be provided");
+        if (!Array.isArray(parsedStats)) {
+            throw new ApiError(400, "Stats must be an array");
+        }
+
+        const existingStats:IStat[]=existing.stats? JSON.parse(JSON.stringify(existing.stats)):[];
+
+        const mergedStats= existingStats.map((existingStat)=>{
+            const updatedMatch= parsedStats.find((s:IStat)=> s.label === existingStat.label);
+            return updatedMatch? {...existingStat, ...updatedMatch}:existingStat;
+        })
+
+        if(mergedStats.length!==4){
+            throw new ApiError(400,"Exactly 4 stats must be provided");
         }
 
         updateData.stats = parsedStats;
@@ -119,9 +133,10 @@ export const updateAboutUs = asyncHandler(async (req: Request, res: Response) =>
 
     if (ceoPhotoFile) {
         const uploadedCeoPhoto = await uploadImageToCloud(ceoPhotoFile, "about-us");
+        const baseCeoQuote = updateData.ceoQuote ?? (existing.ceoQuote ? JSON.parse(JSON.stringify(existing.ceoQuote)) : {});
 
         updateData.ceoQuote = {
-            ...(updateData.ceoQuote || existing.ceoQuote),
+            ...baseCeoQuote,
             ceoPhoto: uploadedCeoPhoto.url,
             ceoPhotoPublicId: uploadedCeoPhoto.publicId,
         };
