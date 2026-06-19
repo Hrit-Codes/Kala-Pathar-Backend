@@ -12,6 +12,7 @@ import packagetypeRoutes from "./routes/packageTypeRoutes";
 import companyinfoRoutes from "./routes/companyInfoRoutes";
 import whyChooseUsRoutes from "./routes/whyChooseUsRoutes";
 import aboutUsRoutes from "./routes/aboutUsRoutes";
+import galleryRoutes from "./routes/galleryRoutes";
 
 dotenv.config();
 
@@ -42,3 +43,4 @@ app.use("/api/packagetype",packagetypeRoutes);
 app.use("/api/companyinfo",companyinfoRoutes);
 app.use("/api/whychooseus",whyChooseUsRoutes);
 app.use("/api/aboutus",aboutUsRoutes);
+app.use("/api/gallery",galleryRoutes);
