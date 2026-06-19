@@ -1,8 +1,8 @@
 import type { Request, Response } from "express";
-import { AboutUs } from "../model/aboutUs.model";
-import { ApiError } from "../utils/apiError";
+import { AboutUs, type IStat } from "../model/aboutUs.model";
 import { asyncHandler } from "../utils/asyncHandler";
 import { deleteFromCloud, uploadImageToCloud } from "../helpers/cloudinaryUpload";
+import { ApiError } from "../utils/apiError";
 
 export const createAboutUs = asyncHandler(async (req: Request, res: Response) => {
     const existing = await AboutUs.findOne();
@@ -114,7 +114,7 @@ export const updateAboutUs = asyncHandler(async (req: Request, res: Response) =>
             return updatedMatch? {...existingStat, ...updatedMatch}:existingStat;
         })
 
-        if(mergedStats.length!===4){
+        if(mergedStats.length!==4){
             throw new ApiError(400,"Exactly 4 stats must be provided");
         }
 
