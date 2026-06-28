@@ -14,19 +14,19 @@ const transporter= nodemailer.createTransport(
     }
 )
 
-interface SendMailOptions{
-    to:string,
-    sub:string,
-    msg:string
+interface SendMailOptions {
+    to: string;
+    subject: string; 
+    html: string;
 }
 
-export const sendMail=async({to,sub,msg}:SendMailOptions)=>{
+export const sendMail=async({to,subject,html}:SendMailOptions)=>{
     try{
         await transporter.sendMail({
             from:loadEnv.EMAIL_USER,
             to,
-            subject:sub,
-            html:msg
+            subject:subject,
+            html:html
         })
     }catch(error){
         console.log("Error sending mail:",error);

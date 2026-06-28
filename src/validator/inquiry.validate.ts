@@ -26,3 +26,7 @@ export const createInquirySchema = Joi.object({
         "any.required": "Description is required",
     }),
 });
+
+export const replyToInquirySchema=Joi.object({
+    message:Joi.string().trim().min(10).max(1000).required(),
+})
