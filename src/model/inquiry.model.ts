@@ -1,11 +1,15 @@
 import mongoose from "mongoose";
 
 export interface IInquiry extends Document {
-    fullname:string,
-    email:string,
-    phone:string,
-    subject:string,
-    description:string
+    fullname:string;
+    email:string;
+    phone:string;
+    subject:string;
+    description:string;
+    isReplied:boolean;
+    repliedAt?:Date;
+    createdAt?:Date;
+    updatedAt?:Date;
 }
 
 const inquirySchema= new mongoose.Schema(

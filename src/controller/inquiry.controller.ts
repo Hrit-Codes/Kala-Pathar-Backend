@@ -2,6 +2,8 @@ import type { Request, Response } from "express";
 import { Inquiry } from "../model/inquiry.model";
 import { asyncHandler } from "../utils/asyncHandler";
 import { ApiError } from "../utils/apiError";
+import { sendMail } from "../helpers/mailsend";
+import { inquiryReplyTemplate } from "../helpers/mailTemplate";
 
 export const createInquiry = asyncHandler(async (req: Request, res: Response) => {
     const { fullname, email, phone, subject, description } = req.body;
@@ -91,5 +93,49 @@ export const getAllInquiry=asyncHandler(async(req:Request,res:Response)=>{
             hasNextPage:page*limit<total,
             hasPrevPage:page>1
         }
+    })
+})
+
+export const replyToInquiry=asyncHandler(async(req:Request,res:Response)=>{
+    const {id}=req.params;
+
+    if(!id){
+        throw new ApiError(400,"Id is required");
+    }
+
+    const inquiry= await Inquiry.findById(id);
+
+    if(!inquiry){
+        throw new ApiError(404,"Inquiry not found");
+    }
+
+    if(inquiry.isReplied){
+        throw new ApiError(409,"This inquiry has already been replied to");
+    }
+
+    const {message}=req.body;
+
+    await sendMail({
+        to:inquiry.email,
+        subject:`Re: ${inquiry.subject}`,
+        html:inquiryReplyTemplate(inquiry.fullname, inquiry.subject, message.trim())
+    })
+
+    const updated= await Inquiry.findByIdAndUpdate(
+        id,
+        {
+            isReplied:true,
+            repliedAt:new Date(),
+            replyMessage:message.trim()
+        },
+        {
+            new:true
+        }
+    )
+
+    return res.status(200).json({
+        success:true,
+        message:`Reply sent successfully to ${inquiry.email}`,
+        data:updated
     })
 })
