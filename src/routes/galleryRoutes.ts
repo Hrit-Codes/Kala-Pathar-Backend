@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { isAdmin, isAuthenticated } from "../middleware/auth.middleware";
 import { uploadImage } from "../middleware/upload.middleware";
-import { createGallery, getAllGallery, getGalleryById, updateGallery } from "../controller/gallery.controller";
 import { createGallerySchema, updateGallerySchema } from "../validator/gallery.validate";
 import { validate } from "../middleware/validate.middleware";
+import { createGallery, getAllGallery, getGalleryById, updateGallery } from "../controller/gallery.controller";
 
 const router=Router();
 
