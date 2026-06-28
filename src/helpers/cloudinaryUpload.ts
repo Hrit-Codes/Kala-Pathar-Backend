@@ -1,72 +1,129 @@
 import cloudinary from "../config/cloudinary";
-import { ApiError } from "../utils/apiError";
+import fs from "fs";
 
-export interface CloudinaryUploadResult {
-  url: string;
-  publicId: string;
-  fileName: string;
-  mimeType: string;
+export interface UploadResult {
+    cloudinaryUrl: string;
+    cloudinaryPublicId: string;
+    localUrl: string;
+    localPath: string;
+    fileName: string;
+    mimeType: string;
 }
 
-// For images and documents — data URI approach
-export const uploadImageToCloud = async (
-  file: Express.Multer.File,
-  folder: string
-): Promise<CloudinaryUploadResult> => {
-  const b64 = Buffer.from(file.buffer).toString("base64");
-  const dataUri = `data:${file.mimetype};base64,${b64}`;
+const LOCAL_STORE = "uploads/permanent";
 
-  try {
-    const res = await cloudinary.uploader.upload(dataUri, {
-      folder: `kala-patthar/${folder}`,
-      resource_type: "image",
-    });
-
-    return {
-      url: res.secure_url,
-      publicId: res.public_id,
-      fileName: file.originalname,
-      mimeType: file.mimetype,
-    };
-  } catch (error) {
-    throw new ApiError(500, "Failed to upload image to Cloudinary");
-  }
+//Utility function to ensure directory exists before attempting to write files to it. If the directory does not exist then it creates it (including any parent directories)
+const ensureDir = (dir: string) => {
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 };
 
-// For video — true streaming, avoids holding a 33%-larger base64 copy in memory
-export const uploadVideoToCloud = (
-  file: Express.Multer.File,
-  folder: string
-): Promise<CloudinaryUploadResult> => {
-  return new Promise((resolve, reject) => {
-    const uploadStream = cloudinary.uploader.upload_stream(
-      {
-        folder: `kala-patthar/${folder}`,
-        resource_type: "video",
-      },
-      (error, result) => {
-        if (error || !result) {
-          return reject(new ApiError(500, "Failed to upload video to Cloudinary"));
-        }
-        resolve({
-          url: result.secure_url,
-          publicId: result.public_id,
-          fileName: file.originalname,
-          mimeType: file.mimetype,
+
+export const uploadImageToCloud = async (
+    file: Express.Multer.File,
+    folder: string
+): Promise<UploadResult> => {
+    // Save to local permanently first
+    ensureDir(`${LOCAL_STORE}/${folder}`); //to check if directory exists otherwise create it
+    const localFilePath = `${LOCAL_STORE}/${folder}/${file.filename}`;
+    fs.copyFileSync(file.path, localFilePath);  // copy from temp to permanent
+    fs.unlinkSync(file.path);                   // delete temp
+
+    const localUrl = `${process.env.BASE_URL}/${localFilePath.replace(/\\/g, "/")}`;
+
+    // Then upload to Cloudinary
+    try {
+        const res = await cloudinary.uploader.upload(localFilePath, {
+            folder: `kala-patthar/${folder}`,
+            resource_type: "image",
         });
-      }
-    );
-    uploadStream.end(file.buffer);
-  });
+
+        return {
+            cloudinaryUrl: res.secure_url,
+            cloudinaryPublicId: res.public_id,
+            localUrl,
+            localPath: localFilePath,
+            fileName: file.originalname,
+            mimeType: file.mimetype, //aslo known as Content-Type is a standard that indicates the nature of format of a file. Eg if file is image or video
+        };
+    } catch (error) {
+        // Cloudinary failed but local is already saved — don't throw
+        console.error("Cloudinary upload failed, local copy retained:", error);
+
+        return {
+            cloudinaryUrl: "",        // empty signals cloudinary unavailable
+            cloudinaryPublicId: "",
+            localUrl,
+            localPath: localFilePath,
+            fileName: file.originalname,
+            mimeType: file.mimetype,
+        };
+    }
+};
+
+export const uploadVideoToCloud = async (
+    file: Express.Multer.File,
+    folder: string
+): Promise<UploadResult> => {
+    // Save to local permanently first
+    ensureDir(`${LOCAL_STORE}/${folder}`); //ensure directory exists otherwise create it
+    const localFilePath = `${LOCAL_STORE}/${folder}/${file.filename}`;
+    fs.copyFileSync(file.path, localFilePath); // copy from temp to permanent
+    fs.unlinkSync(file.path); // delete from temp
+
+    const localUrl = `${process.env.BASE_URL}/${localFilePath.replace(/\\/g, "/")}`;
+
+    //Upload to Cloudinary using stream
+    return new Promise((resolve) => {
+        // Create a Cloudinary upload stream
+        const stream = cloudinary.uploader.upload_stream(
+            { folder: `kala-patthar/${folder}`, resource_type: "video" },
+            (error, result) => {
+                // Handle the result
+                if (error || !result) {
+                    console.error("Cloudinary video upload failed, local copy retained:", error);
+                    return resolve({
+                        cloudinaryUrl: "",
+                        cloudinaryPublicId: "",
+                        localUrl,
+                        localPath: localFilePath,
+                        fileName: file.originalname,
+                        mimeType: file.mimetype,
+                    });
+                }
+
+                // Success return both Cloudinary and local info
+                resolve({
+                    cloudinaryUrl: result.secure_url,
+                    cloudinaryPublicId: result.public_id,
+                    localUrl,
+                    localPath: localFilePath,
+                    fileName: file.originalname,
+                    mimeType: file.mimetype,
+                });
+            }
+        );
+
+        fs.createReadStream(localFilePath).pipe(stream);
+    });
 };
 
 export const deleteFromCloud = async (
-  publicId: string,
-  resourceType: "image" | "video" = "image"
+    publicId: string, // Cloudinary public id
+    localPath: string, // Local file path
+    resourceType: "image" | "video" = "image", // What type of file to delete
 ) => {
-  try {
-    await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
-  } catch (error) {
-    throw new ApiError(500, "Failed to delete file from Cloudinary");
-  }
+    // Always delete local first
+    if (localPath && fs.existsSync(localPath)) {
+        fs.unlinkSync(localPath);
+    }
+
+    // Try delete from Cloudinary
+    if (publicId) {
+        try {
+            await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
+        } catch (error) {
+            console.warn("Could not delete from Cloudinary:", error);
+            // Don't throw — local is already deleted
+        }
+    }
 };

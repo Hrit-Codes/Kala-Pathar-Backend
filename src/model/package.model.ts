@@ -53,8 +53,12 @@ export interface ITravelPackage extends Document {
     description: string;
     thumbnail: string;
     thumbnailPublicId: string;
+    thumbnailLocalPath:string;
+    thumbnailLocalUrl:string
     gallery?: string[];
     galleryPublicIds?: string[];
+    galleryLocalPaths?:string[];
+    galleryLocalUrls:string[];
     price: number;
     currency: Currency;
     priceLabel: PriceLabel;
@@ -74,6 +78,8 @@ export interface ITravelPackage extends Document {
     isFeatured: boolean;
     isActive: boolean;
     views: number;
+    thumbnailSource: "cloudinary" | "local";
+    gallerySource?: ("cloudinary" | "local")[];
     createdAt?: Date;
     updatedAt?: Date;
 }
@@ -138,8 +144,12 @@ const travelPackageSchema = new mongoose.Schema(
         description: { type: String, required: true },
         thumbnail: { type: String, required: true },
         thumbnailPublicId: { type: String, required: true },
+        thumbnailLocalPath: {type:String, required:true},
+        thumbnailLocalUrl: [{type:String}],
         gallery: [{ type: String }],
         galleryPublicIds: [{ type: String }],
+        galleryLocalPaths: [{type:String}],
+        galleryLocalUrls: [{type:String}],
         price: { type: Number, required: true, min: 0 },
         currency: { type: String, enum: CURRENCIES, default: "Rs" },
         priceLabel: { type: String, enum: PRICE_LABELS, default: "per person" },
@@ -201,6 +211,8 @@ const travelPackageSchema = new mongoose.Schema(
         isFeatured: { type: Boolean, default: false },
         isActive: { type: Boolean, default: true },
         views: { type: Number, default: 0, min: 0 },
+        thumbnailSource: { type: String, enum: ["cloudinary", "local"], default: "cloudinary" },
+        gallerySource: [{ type: String, enum: ["cloudinary", "local"] }],
     },
     { timestamps: true }
 );
