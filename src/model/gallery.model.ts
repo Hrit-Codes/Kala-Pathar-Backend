@@ -6,6 +6,8 @@ export interface IGallery extends Document {
   description: string;
   image: string;
   imagePublicId: string;
+  imageLocalPath: string;
+  imageLocalUrl: string;
   order: number;
   isActive: boolean;
   createdAt?: Date;
@@ -34,6 +36,14 @@ const gallerySchema= new mongoose.Schema(
             required:true
         },
         imagePublicId:{
+            type:String,
+            required:true
+        },
+        imageLocalPath:{
+            type:String,
+            required:true
+        },
+        imageLocalUrl:{
             type:String,
             required:true
         },
