@@ -6,6 +6,8 @@ export interface IAffiliationItem {
   name: string;
   logo: string;
   logoPublicId: string;
+  logoLocalPath:string;
+  logoLocalUrl:string;
   order: number;
 }
 
@@ -37,6 +39,14 @@ const affiliationItemSchema = new mongoose.Schema<IAffiliationItem>(
     logoPublicId: {
       type: String,
       required: true,
+    },
+    logoLocalPath:{
+      type:String,
+      required:true,
+    },
+    logoLocalUrl:{
+      type:String,
+      required:true,
     },
     order: {
       type: Number,

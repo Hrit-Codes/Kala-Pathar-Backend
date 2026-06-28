@@ -3,6 +3,7 @@ import { AboutUs, type IStat } from "../model/aboutUs.model";
 import { asyncHandler } from "../utils/asyncHandler";
 import { deleteFromCloud, uploadImageToCloud } from "../helpers/cloudinaryUpload";
 import { ApiError } from "../utils/apiError";
+import { resolveImageUrl } from "../utils/resolveImageUrl";
 
 export const createAboutUs = asyncHandler(async (req: Request, res: Response) => {
     const existing = await AboutUs.findOne();
@@ -31,23 +32,31 @@ export const createAboutUs = asyncHandler(async (req: Request, res: Response) =>
 
     let ceoPhotoUrl: string | undefined;
     let ceoPhotoPublicId: string | undefined;
+    let ceoPhotoLocalPath: string | undefined;
+    let ceoPhotoLocalUrl: string | undefined;
 
     if (ceoPhotoFile) {
         const uploadedCeoPhoto = await uploadImageToCloud(ceoPhotoFile, "about-us");
-        ceoPhotoUrl = uploadedCeoPhoto.url;
-        ceoPhotoPublicId = uploadedCeoPhoto.publicId;
+        ceoPhotoUrl = uploadedCeoPhoto.cloudinaryUrl || uploadedCeoPhoto.localUrl;
+        ceoPhotoPublicId = uploadedCeoPhoto.cloudinaryPublicId;
+        ceoPhotoLocalPath = uploadedCeoPhoto.localPath;
+        ceoPhotoLocalUrl = uploadedCeoPhoto.localUrl;
     }
 
     const aboutUs = await AboutUs.create({
         heading: heading.trim(),
         tagline: tagline.trim(),
         description: description.trim(),
-        heroImage: uploadedHeroImage.url,
-        heroImagePublicId: uploadedHeroImage.publicId,
+        heroImage: uploadedHeroImage.cloudinaryUrl || uploadedHeroImage.localUrl,
+        heroImagePublicId: uploadedHeroImage.cloudinaryPublicId,
+        heroImageLocalPath: uploadedHeroImage.localPath,
+        heroImageLocalUrl: uploadedHeroImage.localUrl,
         ceoQuote: {
             ...parsedCeoQuote,
             ceoPhoto: ceoPhotoUrl,
             ceoPhotoPublicId,
+            ceoPhotoLocalPath,
+            ceoPhotoLocalUrl,
         },
         stats: parsedStats,
     });
@@ -60,16 +69,31 @@ export const createAboutUs = asyncHandler(async (req: Request, res: Response) =>
 });
 
 export const getAboutUs = asyncHandler(async (req: Request, res: Response) => {
-    const aboutUs = await AboutUs.findOne();
+    const aboutUs = await AboutUs.findOne().select(
+        "-heroImagePublicId -heroImageLocalPath -ceoQuote.ceoPhotoPublicId -ceoQuote.ceoPhotoLocalPath"
+    );
 
     if (!aboutUs) {
         throw new ApiError(404, "About us content has not been set up yet");
     }
 
+    const heroImage = await resolveImageUrl(aboutUs.heroImage, aboutUs.heroImageLocalUrl);
+
+    const ceoPhoto = aboutUs.ceoQuote?.ceoPhoto
+        ? await resolveImageUrl(aboutUs.ceoQuote.ceoPhoto, aboutUs.ceoQuote.ceoPhotoLocalUrl ?? "")
+        : undefined;
+
     return res.status(200).json({
         success: true,
         message: "About us content fetched successfully",
-        data: aboutUs,
+        data: {
+            ...aboutUs.toObject(),
+            heroImage,
+            ceoQuote: {
+                ...aboutUs.toObject().ceoQuote,
+                ceoPhoto,
+            },
+        },
     });
 });
 
@@ -94,10 +118,10 @@ export const updateAboutUs = asyncHandler(async (req: Request, res: Response) =>
 
     if (ceoQuote !== undefined) {
         const parsedCeoQuote = typeof ceoQuote === "string" ? JSON.parse(ceoQuote) : ceoQuote;
-        const existingCeoQuotePlain = existing.ceoQuote
+        const existingCeoQuote = existing.ceoQuote
             ? JSON.parse(JSON.stringify(existing.ceoQuote))
             : {};
-        updateData.ceoQuote = { ...existingCeoQuotePlain, ...parsedCeoQuote };
+        updateData.ceoQuote = { ...existingCeoQuote, ...parsedCeoQuote };
     }
 
     if (stats !== undefined) {
@@ -107,42 +131,56 @@ export const updateAboutUs = asyncHandler(async (req: Request, res: Response) =>
             throw new ApiError(400, "Stats must be an array");
         }
 
-        const existingStats:IStat[]=existing.stats? JSON.parse(JSON.stringify(existing.stats)):[];
+        const existingStats: IStat[] = existing.stats
+            ? JSON.parse(JSON.stringify(existing.stats))
+            : [];
 
-        const mergedStats= existingStats.map((existingStat)=>{
-            const updatedMatch= parsedStats.find((s:IStat)=> s.label === existingStat.label);
-            return updatedMatch? {...existingStat, ...updatedMatch}:existingStat;
-        })
+        const mergedStats = existingStats.map((existingStat) => {
+            const updatedMatch = parsedStats.find((s: IStat) => s.label === existingStat.label);
+            return updatedMatch ? { ...existingStat, ...updatedMatch } : existingStat;
+        });
 
-        if(mergedStats.length!==4){
-            throw new ApiError(400,"Exactly 4 stats must be provided");
+        if (mergedStats.length !== 4) {
+            throw new ApiError(400, "Exactly 4 stats must be provided");
         }
 
-        updateData.stats = parsedStats;
+        updateData.stats = mergedStats;
     }
 
     if (heroImageFile) {
         const uploadedHeroImage = await uploadImageToCloud(heroImageFile, "about-us");
-        updateData.heroImage = uploadedHeroImage.url;
-        updateData.heroImagePublicId = uploadedHeroImage.publicId;
 
-        if (existing.heroImagePublicId) {
-            await deleteFromCloud(existing.heroImagePublicId, "image");
-        }
+        updateData.heroImage = uploadedHeroImage.cloudinaryUrl || uploadedHeroImage.localUrl;
+        updateData.heroImagePublicId = uploadedHeroImage.cloudinaryPublicId;
+        updateData.heroImageLocalPath = uploadedHeroImage.localPath;
+        updateData.heroImageLocalUrl = uploadedHeroImage.localUrl;
+
+        await deleteFromCloud(
+            existing.heroImagePublicId,
+            existing.heroImageLocalPath,
+            "image"
+        );
     }
 
     if (ceoPhotoFile) {
         const uploadedCeoPhoto = await uploadImageToCloud(ceoPhotoFile, "about-us");
-        const baseCeoQuote = updateData.ceoQuote ?? (existing.ceoQuote ? JSON.parse(JSON.stringify(existing.ceoQuote)) : {});
+        const baseCeoQuote = updateData.ceoQuote
+            ?? (existing.ceoQuote ? JSON.parse(JSON.stringify(existing.ceoQuote)) : {});
 
         updateData.ceoQuote = {
             ...baseCeoQuote,
-            ceoPhoto: uploadedCeoPhoto.url,
-            ceoPhotoPublicId: uploadedCeoPhoto.publicId,
+            ceoPhoto: uploadedCeoPhoto.cloudinaryUrl || uploadedCeoPhoto.localUrl,
+            ceoPhotoPublicId: uploadedCeoPhoto.cloudinaryPublicId,
+            ceoPhotoLocalPath: uploadedCeoPhoto.localPath,
+            ceoPhotoLocalUrl: uploadedCeoPhoto.localUrl,
         };
 
         if (existing.ceoQuote?.ceoPhotoPublicId) {
-            await deleteFromCloud(existing.ceoQuote.ceoPhotoPublicId, "image");
+            await deleteFromCloud(
+                existing.ceoQuote.ceoPhotoPublicId,
+                existing.ceoQuote.ceoPhotoLocalPath ?? "",
+                "image"
+            );
         }
     }
 
@@ -151,10 +189,9 @@ export const updateAboutUs = asyncHandler(async (req: Request, res: Response) =>
     const updatedAboutUs = await AboutUs.findByIdAndUpdate(
         existing._id,
         updateData,
-        {
-            new: true,
-            runValidators: true,
-        }
+        { new: true, runValidators: true }
+    ).select(
+        "-heroImagePublicId -heroImageLocalPath -ceoQuote.ceoPhotoPublicId -ceoQuote.ceoPhotoLocalPath"
     );
 
     return res.status(200).json({

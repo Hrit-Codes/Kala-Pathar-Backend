@@ -15,6 +15,7 @@ import aboutUsRoutes from "./routes/aboutUsRoutes";
 import galleryRoutes from "./routes/galleryRoutes";
 import partnerRoutes from "./routes/partnerRoutes";
 import packageRoutes from "./routes/packageRoutes";
+import path from "path";
 
 dotenv.config();
 
@@ -48,3 +49,5 @@ app.use("/api/aboutus",aboutUsRoutes);
 app.use("/api/gallery",galleryRoutes);
 app.use("/api/partner",partnerRoutes);
 app.use("/api/package",packageRoutes);
+
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));

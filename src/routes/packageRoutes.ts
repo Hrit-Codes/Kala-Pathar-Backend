@@ -11,7 +11,7 @@ import {
     getTravelPackageBySlug,
     getAllTravelPackages,
     getAllActiveTravelPackages,
-} from "../controller/packageController";
+} from "../controller/package.controller";
 import {
     createTravelPackageSchema,
     updateTravelPackageSchema,
