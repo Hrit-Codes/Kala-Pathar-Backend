@@ -10,6 +10,8 @@ import {
     FEATURED_MAX,
 } from "../utils/featuredPackageGuard";
 import { TravelPackage } from "../model/package.model";
+import { resolveImageUrl } from "../utils/resolveImageUrl";
+import { ImageResolver } from "../utils/imageResolver";
 
 const parse = (field: any) =>
     typeof field === "string" ? JSON.parse(field) : field ?? [];
@@ -59,10 +61,14 @@ export const createTravelPackage = asyncHandler(async (req: Request, res: Respon
         badge: badge?.trim(),
         overviewTitle: overviewTitle?.trim(),
         description: description.trim(),
-        thumbnail: uploadedThumbnail.url,
-        thumbnailPublicId: uploadedThumbnail.publicId,
-        gallery: uploadedGallery.map((g) => g.url),
-        galleryPublicIds: uploadedGallery.map((g) => g.publicId),
+        thumbnail: uploadedThumbnail.cloudinaryUrl || uploadedThumbnail.localUrl,
+        thumbnailPublicId: uploadedThumbnail.cloudinaryPublicId,
+        thumbnailLocalPath: uploadedThumbnail.localPath,
+        thumbnailLocalUrl: uploadedThumbnail.localUrl,
+        gallery: uploadedGallery.map((g) => g.cloudinaryUrl || g.localUrl),
+        galleryPublicIds: uploadedGallery.map((g) => g.cloudinaryPublicId),
+        galleryLocalPaths: uploadedGallery.map((g)=> g.localPath),
+        galleryLocalUrls: uploadedGallery.map((g)=>g.localUrl),
         price: Number(price),
         currency: currency ?? "Rs",
         priceLabel: priceLabel ?? "per person",
@@ -159,17 +165,30 @@ export const updateTravelPackage = asyncHandler(async (req: Request, res: Respon
 
     if (thumbnailFile) {
         const uploadedThumbnail = await uploadImageToCloud(thumbnailFile, "packages/thumbnails");
-        updateData.thumbnail = uploadedThumbnail.url;
-        updateData.thumbnailPublicId = uploadedThumbnail.publicId;
+        updateData.thumbnail = uploadedThumbnail.cloudinaryUrl || uploadedThumbnail.localUrl;
+        updateData.thumbnailPublicId = uploadedThumbnail.cloudinaryPublicId;
+        updateData.thumbnailLocalPath = uploadedThumbnail.localPath;
+        updateData.thumbnailLocalUrl = uploadedThumbnail.localUrl;
         if (existingPackage.thumbnailPublicId) {
-            await deleteFromCloud(existingPackage.thumbnailPublicId, "image");
+            await deleteFromCloud(
+                existingPackage.thumbnailPublicId,
+                existingPackage.thumbnailLocalPath,  
+                "image"
+            );
         }
     }
+
 
     if (galleryFiles.length > 0) {
         if (existingPackage.galleryPublicIds?.length) {
             await Promise.all(
-                existingPackage.galleryPublicIds.map((pid) => deleteFromCloud(pid, "image"))
+                existingPackage.galleryPublicIds.map((pid, i) =>
+                    deleteFromCloud(
+                        pid,
+                        existingPackage.galleryLocalPaths?.[i]??"",
+                        "image",
+                    )
+                )
             );
         }
         const uploadedGallery = await Promise.all(
@@ -177,8 +196,11 @@ export const updateTravelPackage = asyncHandler(async (req: Request, res: Respon
                 uploadImageToCloud(file, "packages/gallery")
             )
         );
-        updateData.gallery = uploadedGallery.map((g) => g.url);
-        updateData.galleryPublicIds = uploadedGallery.map((g) => g.publicId);
+        updateData.gallery = uploadedGallery.map((g)=>g.cloudinaryUrl || g.localUrl);
+        updateData.galleryPublicIds = uploadedGallery.map((g)=>g.cloudinaryPublicId);
+        updateData.galleryLocalPaths= uploadedGallery.map((g)=>g.localPath);
+        updateData.galleryLocalUrls= uploadedGallery.map((g)=>g.localUrl);
+
     }
 
     updateData.updatedAt = new Date();
@@ -207,12 +229,19 @@ export const deleteTravelPackage = asyncHandler(async (req: Request, res: Respon
     }
 
     if (travelPackage.thumbnailPublicId) {
-        await deleteFromCloud(travelPackage.thumbnailPublicId, "image");
+        await deleteFromCloud(
+            travelPackage.thumbnailPublicId,
+            travelPackage.thumbnailLocalPath,
+            "image"
+        );
     }
+
 
     if (travelPackage.galleryPublicIds?.length) {
         await Promise.all(
-            travelPackage.galleryPublicIds.map((pid) => deleteFromCloud(pid, "image"))
+            travelPackage.galleryPublicIds?.map((pid, i) =>
+                deleteFromCloud(pid, travelPackage.galleryLocalPaths?.[i] ?? "", "image")
+            ) ?? []
         );
     }
 
@@ -303,10 +332,28 @@ export const getTravelPackageBySlug = asyncHandler(async (req: Request, res: Res
 
     if (!travelPackage) throw new ApiError(404, "Travel package not found");
 
+    // Resolve thumbnail URL
+    const thumbnail = await resolveImageUrl(
+        travelPackage.thumbnail,
+        travelPackage.thumbnailLocalUrl
+    );
+
+    // Resolve gallery URLs
+    const gallery = await Promise.all(
+        (travelPackage.gallery ?? []).map((url, i) =>
+            resolveImageUrl(url, travelPackage.galleryLocalUrls?.[i] ?? "")
+        )
+    );
+
+    const data = travelPackage.toObject();
     return res.status(200).json({
         success: true,
         message: "Travel package fetched successfully",
-        data: travelPackage,
+        data: ImageResolver.prepare({
+            ...data,
+            thumbnail: await ImageResolver.resolveSingle(data.thumbnail, data.thumbnailLocalUrl),
+            gallery: await ImageResolver.resolveArray(data.gallery ?? [], data.galleryLocalUrls ?? []),
+        }),
     });
 });
 
@@ -323,7 +370,9 @@ export const getAllActiveTravelPackages = asyncHandler(async (req: Request, res:
     if (packageType) filter.packageType = packageType;
     if (destination) filter.destination = destination;
     if (difficulty) filter.difficulty = difficulty;
-    if (isFeatured !== undefined) filter.isFeatured = JSON.parse(isFeatured as string);
+    if (isFeatured !== undefined && isFeatured !== "") {
+        filter.isFeatured = isFeatured === "true";
+    }
 
     if (minPrice || maxPrice) {
         filter.price = {};
@@ -357,7 +406,7 @@ export const getAllActiveTravelPackages = asyncHandler(async (req: Request, res:
             .sort({ [sortField]: sortDirection })
             .skip(skip)
             .limit(limitNum)
-            .select("-galleryPublicIds -thumbnailPublicId"),
+            .select("-thumbnailPublicId -thumbnailLocalPath -thumbnailLocalUrl -galleryPublicIds -galleryLocalPaths -galleryLocalUrls"),
         TravelPackage.countDocuments(filter),
         TravelPackage.countDocuments({ isFeatured: true }),
     ]);
@@ -394,7 +443,9 @@ export const getAllTravelPackages = asyncHandler(async (req: Request, res: Respo
     if (packageType) filter.packageType = packageType;
     if (destination) filter.destination = destination;
     if (difficulty) filter.difficulty = difficulty;
-    if (isFeatured !== undefined) filter.isFeatured = JSON.parse(isFeatured as string);
+    if (isFeatured !== undefined && isFeatured !== "") {
+        filter.isFeatured = isFeatured === "true";
+    }
 
     if (minPrice || maxPrice) {
         filter.price = {};
@@ -428,7 +479,7 @@ export const getAllTravelPackages = asyncHandler(async (req: Request, res: Respo
             .sort({ [sortField]: sortDirection })
             .skip(skip)
             .limit(limitNum)
-            .select("-galleryPublicIds -thumbnailPublicId"),
+            .select("-thumbnailPublicId -thumbnailLocalPath -thumbnailLocalUrl -galleryPublicIds -galleryLocalPaths -galleryLocalUrls"),
         TravelPackage.countDocuments(filter),
         TravelPackage.countDocuments({ isFeatured: true }),
     ]);

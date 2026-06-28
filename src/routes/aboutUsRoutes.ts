@@ -2,7 +2,7 @@ import { Router } from "express";
 import { uploadImage } from "../middleware/upload.middleware";
 import { isAdmin, isAuthenticated } from "../middleware/auth.middleware";
 import { createAboutUsSchema, updateAboutUsSchema } from "../validator/aboutUs.validate";
-import { createAboutUs, getAboutUs, updateAboutUs } from "../controller/aboutUsController";
+import { createAboutUs, getAboutUs, updateAboutUs } from "../controller/aboutUs.controller";
 import { validate } from "../middleware/validate.middleware";
 
 const router= Router();
