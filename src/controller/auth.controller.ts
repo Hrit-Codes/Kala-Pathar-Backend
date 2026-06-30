@@ -1,3 +1,4 @@
+import { redisClient } from "../config/redis";
 import { Auth } from "../model/auth.model";
 import { ApiError } from "../utils/apiError";
 import { asyncHandler } from "../utils/asyncHandler";
@@ -35,12 +36,15 @@ export const authLogin = asyncHandler(async (req, res) => {
 
   const refreshToken = generateRefreshToken();
 
-  user.refresh_token = refreshToken;
-  await user.save();
+  await redisClient.set(
+    `refresh:${refreshToken}`,
+    String(user._id),
+    "EX",
+    7*24*60*60
+  )
 
   const secureUser = user.toObject();
   delete (secureUser as { password?: string }).password;
-  delete (secureUser as { refresh_token?: string }).refresh_token;
 
   const accessTokenCookieOptions = {
     httpOnly: true,
@@ -70,11 +74,10 @@ export const authLogin = asyncHandler(async (req, res) => {
 
 
 export const authLogout = asyncHandler(async (req, res) => {
+  const incomingRefreshToken = req.cookies.refresh_token;
 
-  if(req.auth?._id){
-    await Auth.findByIdAndUpdate(req.auth._id,{
-      $unset:{refresh_token:1},
-    })
+  if(incomingRefreshToken){
+    await redisClient.del(`refresh:${incomingRefreshToken}`)
   }
   const cookieOptions = {
     httpOnly: true,

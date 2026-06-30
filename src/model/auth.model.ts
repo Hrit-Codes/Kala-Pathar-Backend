@@ -44,10 +44,6 @@ const authSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
-    refresh_token: {
-      type: String,
-      select: false,
-    },
   },
   {
     timestamps: true,
