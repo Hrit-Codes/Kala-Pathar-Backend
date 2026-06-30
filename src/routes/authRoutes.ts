@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { authLogin, authLogout } from "../controller/auth.controller";
+import { authLogin, authLogout, refreshAccessToken } from "../controller/auth.controller";
 import { isAuthenticated } from "../middleware/auth.middleware";
 import { loginRateLimiter } from "../middleware/rateLimiter.middleware";
 
@@ -8,5 +8,7 @@ const router = Router();
 router.post("/login",loginRateLimiter, authLogin);
 
 router.post("/logout",isAuthenticated, authLogout);
+
+router.get("/refreshAccessToken",isAuthenticated, refreshAccessToken);
 
 export default router;
