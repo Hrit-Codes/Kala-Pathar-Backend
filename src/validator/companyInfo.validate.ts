@@ -7,7 +7,7 @@ export const createCompanyInfoSchema = Joi.object({
   emails: Joi.alternatives()
     .try(
       Joi.array().items(Joi.string().email()).min(1).max(3),
-      Joi.string() 
+      Joi.string()
     )
     .required(),
   phones: Joi.alternatives()
@@ -28,6 +28,13 @@ export const createCompanyInfoSchema = Joi.object({
     }),
     Joi.string()
   ),
+  mapLatitude: Joi.alternatives()
+    .try(Joi.number(), Joi.string())
+    .required(),
+  mapLongitude: Joi.alternatives()
+    .try(Joi.number(), Joi.string())
+    .required(),
+  mapEmbedUrl: Joi.string().trim().allow(""),
 });
 
 export const updateCompanyInfoSchema = Joi.object({
@@ -44,4 +51,7 @@ export const updateCompanyInfoSchema = Joi.object({
   ),
   description: Joi.string().trim().allow(""),
   socialLinks: Joi.alternatives().try(Joi.object(), Joi.string()),
-}).min(1); 
+  mapLatitude: Joi.alternatives().try(Joi.number(), Joi.string()),
+  mapLongitude: Joi.alternatives().try(Joi.number(), Joi.string()),
+  mapEmbedUrl: Joi.string().trim().allow(""),
+}).min(1);
