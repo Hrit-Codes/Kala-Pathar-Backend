@@ -94,3 +94,57 @@ export const authLogout = asyncHandler(async (req, res) => {
       message: "Logout successful",
     });
 });
+
+export const refreshAccessToken=asyncHandler(async(req,res)=>{
+  const incomingRefreshToken= req.cookies.refresh_token;
+
+  if(!incomingRefreshToken){
+    throw new ApiError(401,"No refresh token provided");
+  }
+
+  const userId= await redisClient.get(`refresh:${incomingRefreshToken}`);
+
+  if(!userId){
+    throw new ApiError(401,"Session expired. Please log in again");
+  }
+
+  const user= await Auth.findById(userId);
+
+  if(!user || !user.isActive){
+    throw new ApiError(401,"Account no longer active");
+  }
+
+  await redisClient.del(`refresh:${incomingRefreshToken}`);
+
+  const newAccessToken= generateAccessToken({_id:user._id, role:user.role});
+
+  const newRefreshToken= generateRefreshToken();
+
+  await redisClient.set(
+    `refresh:${newRefreshToken}`,
+    String(user._id),
+    "EX",
+    7*24*60*60
+  );
+
+  res.cookie("access_token",newAccessToken,{
+    httpOnly:true,
+    secure:process.env.NODE_ENV==="production",
+    sameSite:"strict",
+    maxAge:15*60*1000
+  })
+
+  res.cookie("refresh_token",newRefreshToken,{
+    httpOnly:true,
+    secure:process.env.NODE_ENV==="production",
+    sameSite:"strict",
+    maxAge:7*24*60*60*1000,
+  })
+
+  return res.status(200).json({
+    success:true,
+    message:"Access token refreshed",
+    accessToken: newAccessToken
+  })
+
+})
