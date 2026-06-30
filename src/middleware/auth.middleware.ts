@@ -47,7 +47,7 @@ export const isAuthenticated = asyncHandler(
 
     // 5. Check if user still exists in database
     const user = await Auth.findById(decoded._id)
-      .select("-password -refresh_token ");
+      .select("-password ");
 
     if (!user) {
       throw new ApiError(401, "User no longer exists.");
