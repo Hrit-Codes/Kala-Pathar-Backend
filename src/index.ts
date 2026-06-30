@@ -17,6 +17,7 @@ import partnerRoutes from "./routes/partnerRoutes";
 import packageRoutes from "./routes/packageRoutes";
 import inquiryRoutes from "./routes/inquiryRoutes";
 import path from "path";
+import { globalRateLimiter } from "./middleware/rateLimiter.middleware";
 
 dotenv.config();
 
@@ -45,6 +46,8 @@ app.use(express.urlencoded());
 app.use(cookieParser());
 app.use("/api/public",express.static("public"));
 
+app.use(globalRateLimiter) // Global rate limiting to protect from bots // Applies to every routes below this line
+
 app.use("/api/auth",authRoutes);
 app.use("/api/destination",destinationRoutes);
 app.use("/api/packagetype",packagetypeRoutes);
@@ -57,3 +60,4 @@ app.use("/api/package",packageRoutes);
 app.use("/api/inquiry",inquiryRoutes);
 
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+
