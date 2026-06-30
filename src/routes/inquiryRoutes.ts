@@ -3,10 +3,11 @@ import { createInquiry, deleteInquiry, getAllInquiry, getInquiryById, replyToInq
 import { isAdmin, isAuthenticated } from "../middleware/auth.middleware";
 import { validate } from "../middleware/validate.middleware";
 import { createInquirySchema, replyToInquirySchema } from "../validator/inquiry.validate";
+import { inquiryRateLimiter } from "../middleware/rateLimiter.middleware";
 
 const router=Router();
 
-router.post("/create", validate(createInquirySchema), createInquiry);
+router.post("/create",inquiryRateLimiter, validate(createInquirySchema), createInquiry);
 router.delete("/:id",isAuthenticated,isAdmin, deleteInquiry);
 router.get("/getById/:id",isAuthenticated,isAdmin,getInquiryById);
 router.get("/getAll",isAuthenticated,isAdmin,getAllInquiry);
