@@ -4,8 +4,11 @@ import { PartnerSection } from "../model/partner.model";
 import { ApiError } from "../utils/apiError";
 import { deleteFromCloud, uploadImageToCloud } from "../helpers/cloudinaryUpload";
 import { ImageResolver } from "../utils/imageResolver";
+import { redisClient } from "../config/redis";
 
 const MAX_AFFILIATIONS = 5;
+const PARTNER_CACHE_KEY="partner:section";
+const PARTNER_CACHE_TTL=30*60;
 
 export const createPartnerSection = asyncHandler(async (req: Request, res: Response) => {
     const existing = await PartnerSection.findOne();
@@ -23,6 +26,8 @@ export const createPartnerSection = asyncHandler(async (req: Request, res: Respo
         badges: parsedBadges,
     });
 
+    await redisClient.del(PARTNER_CACHE_KEY);
+
     return res.status(201).json({
         success: true,
         message: "Partner section created successfully",
@@ -31,6 +36,16 @@ export const createPartnerSection = asyncHandler(async (req: Request, res: Respo
 });
 
 export const getPartnerSection = asyncHandler(async (req: Request, res: Response) => {
+    const cached= await redisClient.get(PARTNER_CACHE_KEY);
+
+    if(cached){
+        return res.status(200).json({
+            success:true,
+            message:"Partner section fetched successfully",
+            data:JSON.stringify(cached),
+        })
+    }
+
     const partnerSection = await PartnerSection.findOne().select(
         "-affiliations.logoPublicId -affiliations.logoLocalPath"
     );
@@ -41,17 +56,22 @@ export const getPartnerSection = asyncHandler(async (req: Request, res: Response
 
     const data = partnerSection.toObject();
 
+    const resolved= ImageResolver.prepare({
+        ...data,
+        affiliations:await ImageResolver.resolveSubdocumentArray(data.affiliations,"logo","logoLocalUrl"),
+    })
+
+    await redisClient.set(
+        PARTNER_CACHE_KEY,
+        JSON.stringify(resolved),
+        "EX",
+        PARTNER_CACHE_TTL
+    )
+
     return res.status(200).json({
         success: true,
         message: "Partner section fetched successfully",
-        data: ImageResolver.prepare({
-            ...data,
-            affiliations: await ImageResolver.resolveSubdocumentArray(
-                data.affiliations,
-                "logo",
-                "logoLocalUrl"
-            ),
-        }),
+        data: resolved
     });
 });
 
@@ -82,6 +102,8 @@ export const updatePartnerSection = asyncHandler(async (req: Request, res: Respo
         updateData,
         { new: true, runValidators: true }
     );
+
+    await redisClient.del(PARTNER_CACHE_KEY);
 
     const data = updated?.toObject() ?? {};
 
@@ -128,6 +150,8 @@ export const addAffiliation = asyncHandler(async (req: Request, res: Response) =
         { $push: { affiliations: newAffiliation } },
         { new: true, runValidators: true }
     );
+
+    await redisClient.del(PARTNER_CACHE_KEY);
 
     const addedItem = updated?.affiliations[updated.affiliations.length - 1];
 
@@ -180,6 +204,8 @@ export const updateAffiliation = asyncHandler(async (req: Request, res: Response
         { new: true, runValidators: true }
     );
 
+    await redisClient.del(PARTNER_CACHE_KEY);
+
     const updatedAffiliation = updated?.affiliations.find(
         (a) => a._id?.toString() === id
     );
@@ -215,6 +241,8 @@ export const deleteAffiliation = asyncHandler(async (req: Request, res: Response
         { $pull: { affiliations: { _id: id } } },
         { new: true }
     );
+
+    await redisClient.del(PARTNER_CACHE_KEY);
 
     return res.status(200).json({
         success: true,
