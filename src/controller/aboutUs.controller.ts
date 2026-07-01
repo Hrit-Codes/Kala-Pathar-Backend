@@ -4,6 +4,11 @@ import { asyncHandler } from "../utils/asyncHandler";
 import { deleteFromCloud, uploadImageToCloud } from "../helpers/cloudinaryUpload";
 import { ApiError } from "../utils/apiError";
 import { resolveImageUrl } from "../utils/resolveImageUrl";
+import { redisClient } from "../config/redis";
+import { cache } from "joi";
+
+const ABOUT_US_CACHE_KEY="aboutus:all";
+const ABOUT_US_CACHE_TTL=30*60;
 
 export const createAboutUs = asyncHandler(async (req: Request, res: Response) => {
     const existing = await AboutUs.findOne();
@@ -61,6 +66,8 @@ export const createAboutUs = asyncHandler(async (req: Request, res: Response) =>
         stats: parsedStats,
     });
 
+    await redisClient.del(ABOUT_US_CACHE_KEY);
+
     return res.status(201).json({
         success: true,
         message: "About us content created successfully",
@@ -69,6 +76,14 @@ export const createAboutUs = asyncHandler(async (req: Request, res: Response) =>
 });
 
 export const getAboutUs = asyncHandler(async (req: Request, res: Response) => {
+    const cached= await redisClient.get(ABOUT_US_CACHE_KEY);
+    if(cached){
+        return res.status(200).json({
+            success:true,
+            message:"About us content fetched successfully",
+            data:JSON.parse(cached)
+        })
+    }
     const aboutUs = await AboutUs.findOne().select(
         "-heroImagePublicId -heroImageLocalPath -ceoQuote.ceoPhotoPublicId -ceoQuote.ceoPhotoLocalPath"
     );
@@ -83,17 +98,26 @@ export const getAboutUs = asyncHandler(async (req: Request, res: Response) => {
         ? await resolveImageUrl(aboutUs.ceoQuote.ceoPhoto, aboutUs.ceoQuote.ceoPhotoLocalUrl ?? "")
         : undefined;
 
+    const responseData={
+        ...aboutUs.toObject(),
+        heroImage,
+        ceoQuote:{
+            ...aboutUs.toObject().ceoQuote,
+            ceoPhoto
+        }
+    }
+
+    await redisClient.set(
+        ABOUT_US_CACHE_KEY,
+        JSON.stringify(responseData),
+        "EX",
+        ABOUT_US_CACHE_TTL
+    )
+
     return res.status(200).json({
         success: true,
         message: "About us content fetched successfully",
-        data: {
-            ...aboutUs.toObject(),
-            heroImage,
-            ceoQuote: {
-                ...aboutUs.toObject().ceoQuote,
-                ceoPhoto,
-            },
-        },
+        data: responseData
     });
 });
 
@@ -193,6 +217,8 @@ export const updateAboutUs = asyncHandler(async (req: Request, res: Response) =>
     ).select(
         "-heroImagePublicId -heroImageLocalPath -ceoQuote.ceoPhotoPublicId -ceoQuote.ceoPhotoLocalPath"
     );
+
+    await redisClient.del(ABOUT_US_CACHE_KEY);
 
     return res.status(200).json({
         success: true,
