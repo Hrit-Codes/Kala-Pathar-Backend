@@ -3,10 +3,12 @@ import { asyncHandler } from "../utils/asyncHandler";
 import { Gallery } from "../model/gallery.model";
 import { ApiError } from "../utils/apiError";
 import { deleteFromCloud, uploadImageToCloud } from "../helpers/cloudinaryUpload";
-import { resolveImageUrl } from "../utils/resolveImageUrl";
 import { ImageResolver } from "../utils/imageResolver";
+import { redisClient } from "../config/redis";
 
 const GALLERY_COUNT = 4;
+const GALLERY_CACHE_KEY= "gallery:all";
+const GALLERY_CACHE_TTL=30*60;
 
 export const createGallery = asyncHandler(async (req: Request, res: Response) => {
     const existingCount = await Gallery.countDocuments();
@@ -36,6 +38,8 @@ export const createGallery = asyncHandler(async (req: Request, res: Response) =>
         imageLocalUrl: uploadedImage.localUrl,
         order,
     });
+
+    await redisClient.del(GALLERY_CACHE_KEY);
 
     const totalAfterCreate = await Gallery.countDocuments();
 
@@ -83,31 +87,13 @@ export const updateGallery = asyncHandler(async (req: Request, res: Response) =>
         new: true,
         runValidators: true,
     }).select("-imagePublicId -imageLocalPath -imageLocalUrl");
+    
+    await redisClient.del(GALLERY_CACHE_KEY);
 
     return res.status(200).json({
         success: true,
         message: "Gallery item updated successfully",
         data: updatedGallery,
-    });
-});
-
-export const deleteGallery = asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params;
-    if (!id) throw new ApiError(400, "Id is required");
-
-    const gallery = await Gallery.findById(id).select("-imagePublicId -imageLocalPath -imageLocalUrl");
-    if (!gallery) throw new ApiError(404, "Gallery item not found");
-
-    await deleteFromCloud(gallery.imagePublicId, gallery.imageLocalPath, "image");
-    await Gallery.findByIdAndDelete(id);
-
-    const remaining = await Gallery.countDocuments();
-
-    return res.status(200).json({
-        success: true,
-        message: "Gallery item deleted successfully",
-        data: { _id: gallery._id, title: gallery.title, deletedAt: new Date() },
-        slotsRemaining: GALLERY_COUNT - remaining,
     });
 });
 
@@ -117,8 +103,6 @@ export const getGalleryById = asyncHandler(async (req: Request, res: Response) =
 
     const gallery = await Gallery.findById(id).select("-imagePublicId -imageLocalPath -imageLocalUrl");
     if (!gallery) throw new ApiError(404, "Gallery item not found");
-
-    const image = await resolveImageUrl(gallery.image, gallery.imageLocalUrl);
 
     const data = gallery.toObject();
     return res.status(200).json({
@@ -132,6 +116,17 @@ export const getGalleryById = asyncHandler(async (req: Request, res: Response) =
 });
 
 export const getAllGallery = asyncHandler(async (req: Request, res: Response) => {
+    const cached= await redisClient.get(GALLERY_CACHE_KEY);
+
+    if(cached){
+        return res.status(200).json({
+            success:true,
+            message:"Gallery items fetched successfully",
+            data:JSON.parse(cached).data,
+            total:JSON.parse(cached).total,
+            isFull:JSON.parse(cached).isFull
+        })
+    }
     const galleries = await Gallery.find({ isActive: true })
         .sort({ order: 1, createdAt: -1 })
         .select("-imagePublicId -imageLocalPath -imageLocalUrl");
@@ -145,6 +140,19 @@ export const getAllGallery = asyncHandler(async (req: Request, res: Response) =>
             });
         })
     );
+
+    const responsePayload={
+        data:resolved,
+        total:resolved.length,
+        isFull:resolved.length === GALLERY_COUNT,
+    }
+
+    await redisClient.set(
+        GALLERY_CACHE_KEY,
+        JSON.stringify(responsePayload),
+        "EX",
+        GALLERY_CACHE_TTL
+    )
 
     return res.status(200).json({
         success: true,
