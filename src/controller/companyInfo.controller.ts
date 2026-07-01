@@ -4,6 +4,10 @@ import { asyncHandler } from "../utils/asyncHandler";
 import { CompanyInfo } from "../model/companyInfo.model";
 import { uploadImageToCloud, deleteFromCloud } from "../helpers/cloudinaryUpload";
 import { resolveImageUrl } from "../utils/resolveImageUrl";
+import { redisClient } from "../config/redis";
+
+const COMPANY_INFO_CACHE_KEY="company:info";
+const COMPANY_INFO_CACHE_TTL=30*60;
 
 export const createCompanyInfo = asyncHandler(async (req: Request, res: Response) => {
     const existing = await CompanyInfo.findOne();
@@ -40,6 +44,8 @@ export const createCompanyInfo = asyncHandler(async (req: Request, res: Response
         mapEmbedUrl: mapEmbedUrl?.trim(),
     });
 
+    await redisClient.del(COMPANY_INFO_CACHE_KEY);
+
     return res.status(201).json({
         success: true,
         message: "Company info created successfully",
@@ -48,6 +54,14 @@ export const createCompanyInfo = asyncHandler(async (req: Request, res: Response
 });
 
 export const getCompanyInfo = asyncHandler(async (req: Request, res: Response) => {
+    const cached= await redisClient.get(COMPANY_INFO_CACHE_KEY);
+    if(cached){
+        return res.status(200).json({
+            success:true,
+            message:"Company info fetched successfully",
+            data:JSON.stringify(cached),
+        })
+    }
     const companyInfo = await CompanyInfo.findOne();
 
     if (!companyInfo) {
@@ -59,14 +73,23 @@ export const getCompanyInfo = asyncHandler(async (req: Request, res: Response) =
         companyInfo.logoLocalUrl
     );
 
+    const responseData={
+        ...companyInfo.toObject(),
+        logo,
+        logoLocalPath:undefined
+    }
+
+    await redisClient.set(
+        COMPANY_INFO_CACHE_KEY,
+        JSON.stringify(responseData),
+        "EX",
+        COMPANY_INFO_CACHE_TTL
+    )
+
     return res.status(200).json({
         success: true,
         message: "Company info fetched successfully",
-        data: {
-            ...companyInfo.toObject(),
-            logo,                   
-            logoLocalPath: undefined, 
-        },
+        data: responseData
     });
 });
 
@@ -128,6 +151,8 @@ export const updateCompanyInfo = asyncHandler(async (req: Request, res: Response
         { new: true, runValidators: true }
     );
 
+    await redisClient.del(COMPANY_INFO_CACHE_KEY);
+
     return res.status(200).json({
         success: true,
         message: "Company info updated successfully",
@@ -149,6 +174,8 @@ export const deleteCompanyInfo = asyncHandler(async (req: Request, res: Response
     );
 
     await CompanyInfo.deleteOne();
+
+    await redisClient.del(COMPANY_INFO_CACHE_KEY);
 
     return res.status(200).json({
         success: true,
