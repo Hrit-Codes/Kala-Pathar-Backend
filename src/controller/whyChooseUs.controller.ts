@@ -1,9 +1,12 @@
-import type { Request, Response } from "express";
+import { response, type Request, type Response } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { ApiError } from "../utils/apiError";
 import { WhyChooseUs } from "../model/whyChooseUs.model";
+import { redisClient } from "../config/redis";
 
 const MAX_WHY_CHOOSE_US_ENTRIES=3;
+const WHY_CHOOSE_US_CACHE_KEY="why-choose-us:all";
+const WHY_CHOOSE_US_CACHE_TTL=30*60;
 
 export const createWhyChooseUs = asyncHandler(async (req: Request, res: Response) => {
     const { title, description, icon, order, isActive } = req.body;  // add icon
@@ -26,6 +29,8 @@ export const createWhyChooseUs = asyncHandler(async (req: Request, res: Response
         order,
         isActive
     });
+
+    await redisClient.del(WHY_CHOOSE_US_CACHE_KEY);
 
     return res.status(200).json({
         success: true,
@@ -57,6 +62,8 @@ export const updateWhyChooseUs= asyncHandler(async(req:Request, res:Response)=>{
 
     await whyChooseUs.save();
 
+    await redisClient.del(WHY_CHOOSE_US_CACHE_KEY);
+
     return res.status(200).json({
         success:true,
         message:"Why Choose Us entry updated successfully",
@@ -65,13 +72,34 @@ export const updateWhyChooseUs= asyncHandler(async(req:Request, res:Response)=>{
 })
 
 export const getAllWhyChooseUs=asyncHandler(async(req:Request,res:Response)=>{
+    const cached= await redisClient.get(WHY_CHOOSE_US_CACHE_KEY);
+
+    if(cached){
+        return res.status(200).json({
+            success:true,
+            message:"All Why Choose Us entries fetched successfully",
+            ...JSON.parse(cached)
+        })
+    }
+
     const entries= await WhyChooseUs.find().sort({order:1});
+
+    const responsePayload={
+        count:entries.length,
+        data:entries
+    }
+
+    await redisClient.set(
+        WHY_CHOOSE_US_CACHE_KEY,
+        JSON.stringify(responsePayload),
+        "EX",
+        WHY_CHOOSE_US_CACHE_TTL
+    )
 
     return res.status(200).json({
         success:true,
         message:"All Why Choose Us entries fetched successfully",
-        count:entries.length,
-        data:entries
+        ...responsePayload
     })
 
 })
