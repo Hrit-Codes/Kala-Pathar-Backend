@@ -15,7 +15,7 @@ export interface ICompanyInfo extends Document {
     officeTelephone: string;
     emails: string[];
     phones: string[];
-    description?: string;
+    description: string;
     logo: string;               // active URL (cloudinary or local fallback)
     logoPublicId: string;       // cloudinary public id
     logoLocalPath: string;      // server file path
