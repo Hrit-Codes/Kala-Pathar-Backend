@@ -3,8 +3,8 @@ import { ApiError } from "../utils/apiError";
 import { asyncHandler } from "../utils/asyncHandler";
 import { CompanyInfo } from "../model/companyInfo.model";
 import { uploadImageToCloud, deleteFromCloud } from "../helpers/cloudinaryUpload";
-import { resolveImageUrl } from "../utils/resolveImageUrl";
 import { redisClient } from "../config/redis";
+import { ImageResolver } from "../utils/imageResolver";
 
 const COMPANY_INFO_CACHE_KEY="company:info";
 const COMPANY_INFO_CACHE_TTL=30*60;
@@ -59,24 +59,20 @@ export const getCompanyInfo = asyncHandler(async (req: Request, res: Response) =
         return res.status(200).json({
             success:true,
             message:"Company info fetched successfully",
-            data:JSON.stringify(cached),
+            data:JSON.parse(cached),
         })
     }
-    const companyInfo = await CompanyInfo.findOne();
+    const companyInfo = await CompanyInfo.findOne().select("-logoPublicId -logoLocalPath");
 
     if (!companyInfo) {
         throw new ApiError(404, "Company info has not been set up yet");
     }
 
-    const logo = await resolveImageUrl(
-        companyInfo.logo,
-        companyInfo.logoLocalUrl
-    );
+    const data=companyInfo.toObject();
 
     const responseData={
-        ...companyInfo.toObject(),
-        logo,
-        logoLocalPath:undefined
+        ...data,
+        logo:await ImageResolver.resolveSingle(data.logo,data.logoLocalUrl),
     }
 
     await redisClient.set(
