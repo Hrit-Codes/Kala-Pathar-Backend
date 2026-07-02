@@ -3,9 +3,8 @@ import { AboutUs, type IStat } from "../model/aboutUs.model";
 import { asyncHandler } from "../utils/asyncHandler";
 import { deleteFromCloud, uploadImageToCloud } from "../helpers/cloudinaryUpload";
 import { ApiError } from "../utils/apiError";
-import { resolveImageUrl } from "../utils/resolveImageUrl";
 import { redisClient } from "../config/redis";
-import { cache } from "joi";
+import { ImageResolver } from "../utils/imageResolver";
 
 const ABOUT_US_CACHE_KEY="aboutus:all";
 const ABOUT_US_CACHE_TTL=30*60;
@@ -92,19 +91,16 @@ export const getAboutUs = asyncHandler(async (req: Request, res: Response) => {
         throw new ApiError(404, "About us content has not been set up yet");
     }
 
-    const heroImage = await resolveImageUrl(aboutUs.heroImage, aboutUs.heroImageLocalUrl);
-
-    const ceoPhoto = aboutUs.ceoQuote?.ceoPhoto
-        ? await resolveImageUrl(aboutUs.ceoQuote.ceoPhoto, aboutUs.ceoQuote.ceoPhotoLocalUrl ?? "")
-        : undefined;
+    const data=aboutUs.toObject();
 
     const responseData={
-        ...aboutUs.toObject(),
-        heroImage,
-        ceoQuote:{
-            ...aboutUs.toObject().ceoQuote,
-            ceoPhoto
-        }
+        ...data,
+        heroImage:await ImageResolver.resolveSingle(data.heroImage, data.heroImageLocalUrl),
+        ceoQuote:await ImageResolver.resolveSubdocument(
+            data.ceoQuote,
+            "ceoPhoto",
+            "ceoPhotoLocalUrl"
+        )
     }
 
     await redisClient.set(
