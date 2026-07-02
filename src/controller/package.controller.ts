@@ -10,8 +10,18 @@ import {
     FEATURED_MAX,
 } from "../utils/featuredPackageGuard";
 import { TravelPackage } from "../model/package.model";
-import { resolveImageUrl } from "../utils/resolveImageUrl";
 import { ImageResolver } from "../utils/imageResolver";
+import { redisClient } from "../config/redis";
+
+const PACKAGES_CACHE_TTL=5*60;
+
+const getPackagesCacheKey=(query:Record<string,string | undefined>)=>
+    `packages:active:${JSON.stringify(query)}`;
+
+const invalidatePackagesCache=async()=>{
+    const keys=await redisClient.keys("packages:active:*");
+    if(keys.length>0) await redisClient.del(...keys);
+}
 
 const parse = (field: any) =>
     typeof field === "string" ? JSON.parse(field) : field ?? [];
@@ -88,6 +98,8 @@ export const createTravelPackage = asyncHandler(async (req: Request, res: Respon
         isFeatured: willBeFeatured,
         isActive: isActive !== undefined ? JSON.parse(isActive) : true,
     });
+
+    await invalidatePackagesCache();
 
     return res.status(201).json({
         success: true,
@@ -210,6 +222,8 @@ export const updateTravelPackage = asyncHandler(async (req: Request, res: Respon
         runValidators: true,
     });
 
+    await invalidatePackagesCache();
+
     return res.status(200).json({
         success: true,
         message: "Travel package updated successfully",
@@ -247,6 +261,8 @@ export const deleteTravelPackage = asyncHandler(async (req: Request, res: Respon
 
     await TravelPackage.findByIdAndDelete(id);
 
+    await invalidatePackagesCache();
+
     return res.status(200).json({
         success: true,
         message: "Travel package deleted successfully",
@@ -276,6 +292,8 @@ export const toggleFeaturedStatus = asyncHandler(async (req: Request, res: Respo
         { isFeatured: !travelPackage.isFeatured },
         { new: true }
     );
+
+    await invalidatePackagesCache();
 
     const featuredCount = await getFeaturedCount();
 
@@ -307,6 +325,8 @@ export const toggleActiveStatus = asyncHandler(async (req: Request, res: Respons
         { new: true }
     );
 
+    await invalidatePackagesCache();
+
     return res.status(200).json({
         success: true,
         message: `Package ${updated?.isActive ? "activated" : "deactivated"} successfully`,
@@ -332,20 +352,8 @@ export const getTravelPackageBySlug = asyncHandler(async (req: Request, res: Res
 
     if (!travelPackage) throw new ApiError(404, "Travel package not found");
 
-    // Resolve thumbnail URL
-    const thumbnail = await resolveImageUrl(
-        travelPackage.thumbnail,
-        travelPackage.thumbnailLocalUrl
-    );
-
-    // Resolve gallery URLs
-    const gallery = await Promise.all(
-        (travelPackage.gallery ?? []).map((url, i) =>
-            resolveImageUrl(url, travelPackage.galleryLocalUrls?.[i] ?? "")
-        )
-    );
-
     const data = travelPackage.toObject();
+
     return res.status(200).json({
         success: true,
         message: "Travel package fetched successfully",
@@ -364,6 +372,17 @@ export const getAllActiveTravelPackages = asyncHandler(async (req: Request, res:
         isFeatured, search, page, limit,
         sortBy, sortOrder,
     } = req.query as Record<string, string | undefined>;
+
+    const cacheKey= getPackagesCacheKey(req.query as Record <string, string | undefined>);
+    const cached= await redisClient.get(cacheKey);
+
+    if(cached){
+        return res.status(200).json({
+            success:true,
+            message:"Travel packages fetched successfully",
+            ...JSON.parse(cached)
+        })
+    }
 
     const filter: Record<string, any> = { isActive: true };
 
@@ -411,22 +430,28 @@ export const getAllActiveTravelPackages = asyncHandler(async (req: Request, res:
         TravelPackage.countDocuments({ isFeatured: true }),
     ]);
 
+    const responsePayload={
+        data:packages,
+        pagination:{
+            total,
+            page:pageNum,
+            limit:limitNum,
+            totalPages:Math.ceil(total/limitNum),
+            hasNextPage:pageNum*limitNum<total,
+            hasPrevPage:pageNum>1
+        },
+        featuredCount,
+        featuredMin:FEATURED_MIN,
+        featuredMax:FEATURED_MAX,
+        slotsRemaining:FEATURED_MAX- featuredCount
+    }
+
+    await redisClient.set(cacheKey, JSON.stringify(responsePayload), "EX", PACKAGES_CACHE_TTL);
+
     return res.status(200).json({
         success: true,
         message: "Travel packages fetched successfully",
-        data: packages,
-        pagination: {
-            total,
-            page: pageNum,
-            limit: limitNum,
-            totalPages: Math.ceil(total / limitNum),
-            hasNextPage: pageNum * limitNum < total,
-            hasPrevPage: pageNum > 1,
-        },
-        featuredCount,
-        featuredMin: FEATURED_MIN,
-        featuredMax: FEATURED_MAX,
-        slotsRemaining: FEATURED_MAX - featuredCount,
+        ...responsePayload,
     });
 });
 
