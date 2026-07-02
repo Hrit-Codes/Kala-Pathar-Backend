@@ -2,6 +2,17 @@ import { Request, Response } from "express";
 import { ApiError } from "../utils/apiError";
 import { asyncHandler } from "../utils/asyncHandler";
 import { Destination } from "../model/destinationModel";
+import { redisClient } from "../config/redis";
+
+const DESTINATIONS_CACHE_TTL = 30 * 60;
+
+const getDestinationsCacheKey = (page: number, limit: number) =>
+    `destinations:${page}:${limit}`;
+
+const invalidateDestinationsCache = async () => {
+    const keys = await redisClient.keys("destinations:*");
+    if (keys.length > 0) await redisClient.del(...keys);
+};
 
 export const createDestination= asyncHandler(async (req: Request,res: Response) =>{
     const {name,description, isActive, order}=req.body;
@@ -24,6 +35,8 @@ export const createDestination= asyncHandler(async (req: Request,res: Response) 
         order,
         isActive
     })
+
+    await invalidateDestinationsCache();
 
     return res.status(201).json({
         success:true,
@@ -49,6 +62,8 @@ export const deleteDestination=asyncHandler(async(req:Request, res:Response)=>{
 
     await Destination.findByIdAndDelete(id);
 
+    await invalidateDestinationsCache();
+    
     return res.status(200).json({
         success:true,
         message:"Destination deleted successfully",
@@ -85,6 +100,8 @@ export const toggleDestinationActiveStatus=asyncHandler(async(req:Request,res:Re
         }
     )
 
+    await invalidateDestinationsCache();
+
     const statusMessage= updatedDestination?.isActive? "activated" : "deactivated";
 
     return res.status(200).json({
@@ -120,7 +137,7 @@ export const updateDestination=asyncHandler(async(req:Request,res:Response)=>{
         updateData.name= name.trim();
         updateData.slug= name.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
     }
-    if(description) updateData.description= name.trim();
+    if(description) updateData.description= description.trim();
     if(order!==undefined) updateData.order= order;
     if(isActive !==undefined) updateData.isActive= isActive;
     
@@ -134,6 +151,8 @@ export const updateDestination=asyncHandler(async(req:Request,res:Response)=>{
             runValidators:true,
         }
     )
+
+    await invalidateDestinationsCache();
 
     return res.status(200).json({
         success:true,
@@ -161,8 +180,18 @@ export const getDestinationById=asyncHandler(async(req:Request, res:Response)=>{
 export const getDestinations=asyncHandler(async(req:Request, res:Response)=>{
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
-
     const skip= (page-1) * limit;
+
+    const cacheKey= getDestinationsCacheKey(page,limit);
+    const cached= await redisClient.get(cacheKey);
+
+    if(cached){
+        return res.status(200).json({
+            success:true,
+            message:"Destinations fetched successfully",
+            ...JSON.parse(cached)
+        })
+    }
 
     const [destinations, total]= await Promise.all([
         Destination.find()
@@ -172,9 +201,7 @@ export const getDestinations=asyncHandler(async(req:Request, res:Response)=>{
         Destination.countDocuments()
     ]);
 
-    return res.status(200).json({
-        success:true,
-        message:"Destinations fetched successfully",
+    const responsePayload={
         data:destinations,
         pagination:{
             total,
@@ -184,5 +211,18 @@ export const getDestinations=asyncHandler(async(req:Request, res:Response)=>{
             hasNextPage:page*limit<total,
             hasPrevPage:page>1
         }
+    }
+
+    await redisClient.set(
+        cacheKey,
+        JSON.stringify(responsePayload),
+        "EX",
+        DESTINATIONS_CACHE_TTL
+    )
+
+    return res.status(200).json({
+        success:true,
+        message:"Destinations fetched successfully",
+        ...responsePayload
     })
 })
