@@ -151,20 +151,20 @@ export const updateAboutUs = asyncHandler(async (req: Request, res: Response) =>
             throw new ApiError(400, "Stats must be an array");
         }
 
-        const existingStats: IStat[] = existing.stats
-            ? JSON.parse(JSON.stringify(existing.stats))
-            : [];
-
-        const mergedStats = existingStats.map((existingStat) => {
-            const updatedMatch = parsedStats.find((s: IStat) => s.label === existingStat.label);
-            return updatedMatch ? { ...existingStat, ...updatedMatch } : existingStat;
-        });
-
-        if (mergedStats.length !== 4) {
+        if (parsedStats.length !== 4) {
             throw new ApiError(400, "Exactly 4 stats must be provided");
         }
 
-        updateData.stats = mergedStats;
+        parsedStats.forEach((stat:IStat)=>{
+            if(!stat.label || !stat.value){
+                throw new ApiError(400,"Each stat must have both label and value");
+            }
+            if(typeof stat.label!=="string" || typeof stat.value!== "string"){
+                throw new ApiError(400,"Stat label and value must be string");
+            }
+        })
+
+        updateData.stats = parsedStats;
     }
 
     if (heroImageFile) {
