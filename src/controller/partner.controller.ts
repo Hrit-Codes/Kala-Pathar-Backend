@@ -42,7 +42,7 @@ export const getPartnerSection = asyncHandler(async (req: Request, res: Response
         return res.status(200).json({
             success:true,
             message:"Partner section fetched successfully",
-            data:JSON.stringify(cached),
+            data:JSON.parse(cached),
         })
     }
 
