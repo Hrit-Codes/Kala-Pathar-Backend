@@ -77,12 +77,12 @@ const partnerSectionSchema = new mongoose.Schema(
       },
     },
     badges: {
-      type: [String],
-      default: [],
-      validate: {
-        validator: (arr: string[]) => arr.length <= 6,
-        message: "A maximum of 4 badge entries are allowed",
-      },
+        type: [String],
+        default: [],
+        validate: {
+            validator: (arr: string[]) => arr.length >= 2 && arr.length <= 6,
+            message: "Between 2 and 6 badges are required",
+        },
     },
   },
   {
