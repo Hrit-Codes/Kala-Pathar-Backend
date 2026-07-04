@@ -4,7 +4,7 @@ export const createPartnerSectionSchema = Joi.object({
     sectionTitle: Joi.string().trim().min(2).required(),
     sectionTagline: Joi.string().trim().min(2).required(),
     badges: Joi.alternatives().try(
-        Joi.array().items(Joi.string().trim()).max(6),
+        Joi.array().items(Joi.string().trim()).min(2).max(6),
         Joi.string()
     ),
 });
@@ -13,7 +13,7 @@ export const updatePartnerSectionSchema = Joi.object({
     sectionTitle: Joi.string().trim().min(2),
     sectionTagline: Joi.string().trim().min(2),
     badges: Joi.alternatives().try(
-        Joi.array().items(Joi.string().trim()).max(6),
+        Joi.array().items(Joi.string().trim()).min(2).max(6),
         Joi.string()
     ),
 }).min(1);
