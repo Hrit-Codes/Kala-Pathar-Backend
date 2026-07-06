@@ -16,6 +16,7 @@ import galleryRoutes from "./routes/galleryRoutes";
 import partnerRoutes from "./routes/partnerRoutes";
 import packageRoutes from "./routes/packageRoutes";
 import inquiryRoutes from "./routes/inquiryRoutes";
+import subscriberRoutes from "./routes/subscriberRoutes";
 import path from "path";
 import { globalRateLimiter } from "./middleware/rateLimiter.middleware";
 
@@ -58,6 +59,7 @@ app.use("/api/gallery",galleryRoutes);
 app.use("/api/partner",partnerRoutes);
 app.use("/api/package",packageRoutes);
 app.use("/api/inquiry",inquiryRoutes);
+app.use("/api/subscriber",subscriberRoutes)
 
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
