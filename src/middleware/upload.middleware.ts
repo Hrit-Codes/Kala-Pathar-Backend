@@ -57,3 +57,20 @@ export const uploadVideo= multer({
     fileFilter: videoFileFilter,
     limits:{fileSize: 100*1024*1024}
 })
+
+export const uploadCampaignAttachments = multer({
+    storage: diskStorage,
+    limits: { fileSize: 10 * 1024 * 1024 }, 
+    fileFilter: (_req, file, cb) => {
+        const allowed = [
+            "image/jpeg", "image/png", "image/webp",
+            "application/pdf",
+            "application/msword",
+        ];
+        if (allowed.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new ApiError(400, "Only images, PDFs, and Word documents are allowed") as any);
+        }
+    },
+})
