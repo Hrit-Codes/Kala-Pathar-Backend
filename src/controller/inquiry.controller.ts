@@ -8,8 +8,24 @@ import { redisClient } from "../config/redis";
 
 const INQUIRY_CACHE_TTL=30*60;
 
-const getPaginationKey=(page:number, limit:number)=>`inquiries:list:page:${page}:limit:${limit}`;
-const getSingleCacheKey=(id:string)=>`inquiries:single:${id}`;
+const getPaginationKey = (page: number, limit: number, status: string) =>
+  `inquiries:list:page:${page}:limit:${limit}:status:${status}`;
+const getSingleCacheKey = (id: string) => `inquiries:single:${id}`;
+
+const clearInquiryListCache = async () => {
+  const stream = redisClient.scanStream({ match: "inquiries:list:*" });
+  const pipeline = redisClient.pipeline();
+  let found = false;
+
+  for await (const keys of stream) {
+    if (keys.length) {
+      found = true;
+      keys.forEach((key: string) => pipeline.del(key));
+    }
+  }
+
+  if (found) await pipeline.exec();
+};
 
 export const createInquiry = asyncHandler(async (req: Request, res: Response) => {
     const { fullname, email, phone, subject, description } = req.body;
@@ -21,6 +37,8 @@ export const createInquiry = asyncHandler(async (req: Request, res: Response) =>
         subject: subject.trim(),
         description: description.trim(),
     });
+
+    await clearInquiryListCache();
 
     return res.status(201).json({
         success: true,
@@ -82,6 +100,8 @@ export const deleteInquiry=asyncHandler(async(req:Request,res:Response)=>{
 
     await redisClient.del(getSingleCacheKey(id as string));
 
+    await clearInquiryListCache();
+
     return res.status(200).json({
         success:true,
         message:"Inquiry deleted successfully",
@@ -96,8 +116,17 @@ export const deleteInquiry=asyncHandler(async(req:Request,res:Response)=>{
 export const getAllInquiry=asyncHandler(async(req:Request,res:Response)=>{
     const page= parseInt(req.query.page as string) || 1;
     const limit= parseInt(req.query.limit as string) || 10;
+    const statusParam= (req.query.status as string) || "all";
 
-    const cacheKey=getPaginationKey(page,limit);
+    let filter:Record<string,any>={};
+    const normalized=statusParam.toLowerCase();
+    if(normalized==="pending"){
+        filter.isReplied=false
+    }else if(normalized==="replied"){
+        filter.isReplied=true;
+    }
+
+    const cacheKey=getPaginationKey(page,limit,normalized);
 
     const cached=await redisClient.get(cacheKey);
 
@@ -112,12 +141,14 @@ export const getAllInquiry=asyncHandler(async(req:Request,res:Response)=>{
 
     const skip= (page-1)* limit;
 
-    const [inquiries, total]= await Promise.all([
-        Inquiry.find()
-        .sort({order:1, createdAt:-1})
+    const [inquiries, total,pendingCount,repliedCount]= await Promise.all([
+        Inquiry.find(filter)
+        .sort({createdAt:-1})
         .skip(skip)
         .limit(limit),
-        Inquiry.countDocuments()
+        Inquiry.countDocuments(filter),
+        Inquiry.countDocuments({isReplied:false}),
+        Inquiry.countDocuments({isReplied:true})
     ]);
 
     const paginationDetails={
@@ -129,9 +160,16 @@ export const getAllInquiry=asyncHandler(async(req:Request,res:Response)=>{
         hasPrevPage:page>1
     }
 
+    const tabCounts={
+        all:pendingCount+repliedCount,
+        pending:pendingCount,
+        replied:repliedCount
+    }
+
     const cachePayload={
         inquiries,
-        pagination:paginationDetails
+        pagination:paginationDetails,
+        tabCounts
     }
 
     await redisClient.set(
@@ -145,7 +183,8 @@ export const getAllInquiry=asyncHandler(async(req:Request,res:Response)=>{
         success:true,
         message:"Inquiries fetched successfully",
         data:inquiries,
-        pagination:paginationDetails
+        pagination:paginationDetails,
+        tabCounts
     })
 })
 
@@ -186,7 +225,9 @@ export const replyToInquiry=asyncHandler(async(req:Request,res:Response)=>{
         }
     )
 
-    await redisClient.del(getSingleCacheKey(id as string))
+    await redisClient.del(getSingleCacheKey(id as string));
+
+    await clearInquiryListCache();
 
     return res.status(200).json({
         success:true,
