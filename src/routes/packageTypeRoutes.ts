@@ -9,6 +9,6 @@ router.delete("/delete/:id",isAuthenticated,isAdmin,deletePackageType);
 router.patch("/toggleActiveStatus/:id",isAuthenticated,isAdmin,toggleActiveStatus);
 router.put("/updatePackageType/:id",isAuthenticated,isAdmin,updatePackageType);
 router.get("/getPackageTypeById/:id",isAuthenticated,isAdmin,getPackageTypeById);
-router.get("/getPackageTypes",isAuthenticated,isAdmin,getPackageTypes);
+router.get("/getPackageTypes",getPackageTypes);
 
 export default router;
