@@ -5,224 +5,204 @@ import { Destination } from "../model/destinationModel";
 import { redisClient } from "../config/redis";
 
 const DESTINATIONS_CACHE_TTL = 30 * 60;
-
-const getDestinationsCacheKey = (page: number, limit: number) =>
-    `destinations:${page}:${limit}`;
+const DESTINATIONS_CACHE_KEY = "destinations:all";
 
 const invalidateDestinationsCache = async () => {
-    const keys = await redisClient.keys("destinations:*");
-    if (keys.length > 0) await redisClient.del(...keys);
+    await redisClient.del(DESTINATIONS_CACHE_KEY);
 };
 
-export const createDestination= asyncHandler(async (req: Request,res: Response) =>{
-    const {name,description, isActive, order}=req.body;
-    if(!name?.trim()){
-        throw new ApiError(400,"Destination name is required");
+export const createDestination = asyncHandler(async (req: Request, res: Response) => {
+    const { name, description, isActive, order } = req.body;
+    if (!name?.trim()) {
+        throw new ApiError(400, "Destination name is required");
     }
 
-    const slug= name.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    const slug = name.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 
-    const existingDestination = await Destination.findOne({slug});
+    const existingDestination = await Destination.findOne({ slug });
 
-    if(existingDestination){
-        throw new ApiError(409,"A destination with this name already exists");
+    if (existingDestination) {
+        throw new ApiError(409, "A destination with this name already exists");
     }
 
-    const destination= await Destination.create({
-        name:name.trim(),
+    const destination = await Destination.create({
+        name: name.trim(),
         slug,
         description,
         order,
         isActive
-    })
+    });
 
     await invalidateDestinationsCache();
 
     return res.status(201).json({
-        success:true,
-        message:"Destination created successfully",
-        data:destination,
-
+        success: true,
+        message: "Destination created successfully",
+        data: destination,
     });
-}
-);
+});
 
-export const deleteDestination=asyncHandler(async(req:Request, res:Response)=>{
-    const {id} = req.params;
+export const deleteDestination = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
 
-    if(!id){
-        throw new ApiError(400,"Id is required");
+    if (!id) {
+        throw new ApiError(400, "Id is required");
     }
 
-    const destination=await Destination.findById(id);
+    const destination = await Destination.findById(id);
 
-    if(!destination){
-        throw new ApiError(404,"Destination not found");
+    if (!destination) {
+        throw new ApiError(404, "Destination not found");
     }
 
     await Destination.findByIdAndDelete(id);
 
     await invalidateDestinationsCache();
-    
+
     return res.status(200).json({
-        success:true,
-        message:"Destination deleted successfully",
-        data:{
-            _id:destination._id,
-            name:destination.name,
-            deletedAt:new Date(),
+        success: true,
+        message: "Destination deleted successfully",
+        data: {
+            _id: destination._id,
+            name: destination.name,
+            deletedAt: new Date(),
         }
-    })
-})
+    });
+});
 
-export const toggleDestinationActiveStatus=asyncHandler(async(req:Request,res:Response)=>{
-    const {id}= req.params;
+export const toggleDestinationActiveStatus = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
 
-    if(!id){
-        throw new ApiError(400,"Id is required");
+    if (!id) {
+        throw new ApiError(400, "Id is required");
     }
 
-    const destination= await Destination.findById(id);
+    const destination = await Destination.findById(id);
 
-    if(!destination){
-        throw new ApiError(404,"Destination not found");
+    if (!destination) {
+        throw new ApiError(404, "Destination not found");
     }
 
-    const updatedDestination= await Destination.findByIdAndUpdate(
+    const updatedDestination = await Destination.findByIdAndUpdate(
         id,
         {
-            isActive:!destination.isActive,
-            updatedAt:new Date,
+            isActive: !destination.isActive,
+            updatedAt: new Date(),
         },
         {
-            new:true,
-            runValidators:true
+            new: true,
+            runValidators: true
         }
-    )
+    );
 
     await invalidateDestinationsCache();
 
-    const statusMessage= updatedDestination?.isActive? "activated" : "deactivated";
+    const statusMessage = updatedDestination?.isActive ? "activated" : "deactivated";
 
     return res.status(200).json({
-        success:true,
-        message:`Destination ${statusMessage} successfully`,
-        data:{
-            _id:destination._id,
-            name:destination.name,
-            slug:updatedDestination?.slug,
-            isActive:updatedDestination?.isActive,
+        success: true,
+        message: `Destination ${statusMessage} successfully`,
+        data: {
+            _id: destination._id,
+            name: destination.name,
+            slug: updatedDestination?.slug,
+            isActive: updatedDestination?.isActive,
         }
-    })
-})
+    });
+});
 
-export const updateDestination=asyncHandler(async(req:Request,res:Response)=>{
-    const {id}=req.params;
+export const updateDestination = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
 
-    if(!id){
-        throw new ApiError(400,"Id is required");
+    if (!id) {
+        throw new ApiError(400, "Id is required");
     }
 
-    const {name,description,order,isActive}=req.body;
+    const { name, description, order, isActive } = req.body;
 
-    const existingDestination= await Destination.findById(id);
+    const existingDestination = await Destination.findById(id);
 
-    if(!existingDestination){
-        throw new ApiError(404,"Destination not found");
+    if (!existingDestination) {
+        throw new ApiError(404, "Destination not found");
     }
 
-    const updateData:any={};
+    const updateData: any = {};
 
-    if(name){ 
-        updateData.name= name.trim();
-        updateData.slug= name.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    if (name) {
+        updateData.name = name.trim();
+        updateData.slug = name.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
     }
-    if(description) updateData.description= description.trim();
-    if(order!==undefined) updateData.order= order;
-    if(isActive !==undefined) updateData.isActive= isActive;
-    
-    updateData.updatedAt= new Date();
+    if (description) updateData.description = description.trim();
+    if (order !== undefined) updateData.order = order;
+    if (isActive !== undefined) updateData.isActive = isActive;
 
-    const updatedDestination= await Destination.findByIdAndUpdate(
+    updateData.updatedAt = new Date();
+
+    const updatedDestination = await Destination.findByIdAndUpdate(
         id,
         updateData,
         {
-            new:true,
-            runValidators:true,
+            new: true,
+            runValidators: true,
         }
-    )
+    );
 
     await invalidateDestinationsCache();
 
     return res.status(200).json({
-        success:true,
-        message:"Destination updated successfully",
-        data:updatedDestination
-    })    
-})
+        success: true,
+        message: "Destination updated successfully",
+        data: updatedDestination
+    });
+});
 
-export const getDestinationById=asyncHandler(async(req:Request, res:Response)=>{
-    const {id}= req.params;
+export const getDestinationById = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
 
-    if(!id){
-        throw new ApiError(400,"Id is required");
+    if (!id) {
+        throw new ApiError(400, "Id is required");
     }
 
-    const destination= await Destination.findById(id);
+    const destination = await Destination.findById(id);
+
+    if (!destination) {
+        throw new ApiError(404, "Destination not found");
+    }
 
     return res.status(200).json({
-        success:true,
-        message:"Destination data fetched successfully",
-        data:destination
-    })
-})
+        success: true,
+        message: "Destination data fetched successfully",
+        data: destination
+    });
+});
 
-export const getDestinations=asyncHandler(async(req:Request, res:Response)=>{
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 10;
-    const skip= (page-1) * limit;
+export const getDestinations = asyncHandler(async (req: Request, res: Response) => {
+    // Check cache first
+    const cached = await redisClient.get(DESTINATIONS_CACHE_KEY);
 
-    const cacheKey= getDestinationsCacheKey(page,limit);
-    const cached= await redisClient.get(cacheKey);
-
-    if(cached){
+    if (cached) {
         return res.status(200).json({
-            success:true,
-            message:"Destinations fetched successfully",
-            ...JSON.parse(cached)
-        })
+            success: true,
+            message: "Destinations fetched successfully (cached)",
+            data: JSON.parse(cached),
+        });
     }
 
-    const [destinations, total]= await Promise.all([
-        Destination.find()
-        .sort({order:1, createdAt:-1})
-        .skip(skip)
-        .limit(limit),
-        Destination.countDocuments()
-    ]);
+    // Fetch all destinations from database
+    const destinations = await Destination.find()
+        .sort({ order: 1, createdAt: -1 });
 
-    const responsePayload={
-        data:destinations,
-        pagination:{
-            total,
-            page,
-            limit,
-            totalPages:Math.ceil(total/limit),
-            hasNextPage:page*limit<total,
-            hasPrevPage:page>1
-        }
-    }
-
+    // Cache the result
     await redisClient.set(
-        cacheKey,
-        JSON.stringify(responsePayload),
+        DESTINATIONS_CACHE_KEY,
+        JSON.stringify(destinations),
         "EX",
         DESTINATIONS_CACHE_TTL
-    )
+    );
 
     return res.status(200).json({
-        success:true,
-        message:"Destinations fetched successfully",
-        ...responsePayload
-    })
-})
+        success: true,
+        message: "Destinations fetched successfully",
+        data: destinations,
+    });
+});
