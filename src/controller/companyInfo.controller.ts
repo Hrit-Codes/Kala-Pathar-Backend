@@ -144,7 +144,7 @@ export const updateCompanyInfo = asyncHandler(async (req: Request, res: Response
     const updatedCompanyInfo = await CompanyInfo.findByIdAndUpdate(
         existing._id,
         updateData,
-        { new: true, runValidators: true }
+        { returnDocument: "after", runValidators: true }
     );
 
     await redisClient.del(COMPANY_INFO_CACHE_KEY);

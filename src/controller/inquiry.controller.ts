@@ -221,7 +221,7 @@ export const replyToInquiry=asyncHandler(async(req:Request,res:Response)=>{
             replyMessage:message.trim()
         },
         {
-            new:true
+            returnDocument: "after"
         }
     )
 

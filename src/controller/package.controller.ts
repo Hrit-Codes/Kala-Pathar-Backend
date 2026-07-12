@@ -218,7 +218,7 @@ export const updateTravelPackage = asyncHandler(async (req: Request, res: Respon
     updateData.updatedAt = new Date();
 
     const updated = await TravelPackage.findByIdAndUpdate(id, updateData, {
-        new: true,
+        returnDocument: "after",
         runValidators: true,
     });
 
@@ -290,7 +290,7 @@ export const toggleFeaturedStatus = asyncHandler(async (req: Request, res: Respo
     const updated = await TravelPackage.findByIdAndUpdate(
         id,
         { isFeatured: !travelPackage.isFeatured },
-        { new: true }
+        { returnDocument: "after" }
     );
 
     await invalidatePackagesCache();
@@ -322,7 +322,7 @@ export const toggleActiveStatus = asyncHandler(async (req: Request, res: Respons
     const updated = await TravelPackage.findByIdAndUpdate(
         id,
         { isActive: !travelPackage.isActive },
-        { new: true }
+        { returnDocument: "after" }
     );
 
     await invalidatePackagesCache();
@@ -345,7 +345,7 @@ export const getTravelPackageBySlug = asyncHandler(async (req: Request, res: Res
     const travelPackage = await TravelPackage.findOneAndUpdate(
         { slug, isActive: true },
         { $inc: { views: 1 } },
-        { new: true }
+        { returnDocument: "after" }
     )
         .populate("packageType", "name slug icon themeColor hasDifficultyLevels")
         .populate("destination", "name slug");
@@ -525,5 +525,28 @@ export const getAllTravelPackages = asyncHandler(async (req: Request, res: Respo
         featuredMin: FEATURED_MIN,
         featuredMax: FEATURED_MAX,
         slotsRemaining: FEATURED_MAX - featuredCount,
+    });
+});
+
+export const getTravelPackageById = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    if (!id) throw new ApiError(400, "Id is required");
+
+    const travelPackage = await TravelPackage.findById( id )
+        .populate("packageType", "name slug icon themeColor hasDifficultyLevels")
+        .populate("destination", "name slug");
+
+    if (!travelPackage) throw new ApiError(404, "Travel package not found");
+
+    const data = travelPackage.toObject();
+
+    return res.status(200).json({
+        success: true,
+        message: "Travel package fetched successfully",
+        data: ImageResolver.prepare({
+            ...data,
+            thumbnail: await ImageResolver.resolveSingle(data.thumbnail, data.thumbnailLocalUrl),
+            gallery: await ImageResolver.resolveArray(data.gallery ?? [], data.galleryLocalUrls ?? []),
+        }),
     });
 });
