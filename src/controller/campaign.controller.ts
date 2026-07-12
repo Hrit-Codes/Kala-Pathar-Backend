@@ -41,7 +41,7 @@ export const sendCampaign=asyncHandler(async(req:Request,res:Response)=>{
         data:{
             campaignId:String(campaign._id),
             email:subscriber.email,
-            subject:subject.trim,
+            subject:subject.trim(),
             body:body.trim(),
             unsubscribeToken:subscriber.unsubscribeToken,
             attachments

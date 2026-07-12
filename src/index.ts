@@ -17,8 +17,11 @@ import partnerRoutes from "./routes/partnerRoutes";
 import packageRoutes from "./routes/packageRoutes";
 import inquiryRoutes from "./routes/inquiryRoutes";
 import subscriberRoutes from "./routes/subscriberRoutes";
+import campaignRoutes from "./routes/campaignRoutes";
 import path from "path";
 import { globalRateLimiter } from "./middleware/rateLimiter.middleware";
+import { verifyEmailConnection } from "./config/email";
+import "./queue/emailWorker";
 
 dotenv.config();
 
@@ -30,6 +33,7 @@ app.use(cors({
     origin: "http://localhost:3000",
     credentials: true,
 }));
+
 
 app.get("/",(req,res)=>res.send("Server is running"));
 
@@ -59,7 +63,8 @@ app.use("/api/gallery",galleryRoutes);
 app.use("/api/partner",partnerRoutes);
 app.use("/api/package",packageRoutes);
 app.use("/api/inquiry",inquiryRoutes);
-app.use("/api/subscriber",subscriberRoutes)
+app.use("/api/subscriber",subscriberRoutes);
+app.use("/api/campaign",campaignRoutes);
 
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
