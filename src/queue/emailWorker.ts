@@ -1,7 +1,22 @@
 import { Worker, Job } from "bullmq";
-import { transporter } from "../config/nodemailer";
 import { Campaign } from "../model/campaign.model";
 import type { EmailJobData } from "./emailQueue";
+import { transporter } from "../config/email";
+
+const finalizeCampaignIfDone = async (campaignId: string) => {
+    const campaign = await Campaign.findById(campaignId).select(
+        "status successCount failureCount totalRecipients"
+    );
+
+    if (!campaign || campaign.status === "completed" || campaign.status === "failed") return;
+
+    if (campaign.successCount + campaign.failureCount >= campaign.totalRecipients) {
+        await Campaign.findByIdAndUpdate(campaignId, {
+            status: campaign.successCount > 0 ? "completed" : "failed",
+            completedAt: new Date(),
+        });
+    }
+};
 
 const processEmailJob = async (job: Job<EmailJobData>) => {
     const { campaignId, email, subject, body, unsubscribeToken, attachments } = job.data;
@@ -36,6 +51,8 @@ const processEmailJob = async (job: Job<EmailJobData>) => {
     await Campaign.findByIdAndUpdate(campaignId, {
         $inc: { successCount: 1 },
     });
+
+    await finalizeCampaignIfDone(campaignId);
 };
 
 export const emailWorker = new Worker<EmailJobData>(
@@ -57,10 +74,7 @@ emailWorker.on("failed", async (job, error) => {
         await Campaign.findByIdAndUpdate(job.data.campaignId, {
             $inc: { failureCount: 1 },
         });
-    }
-});
 
-emailWorker.on("drained", async () => {
-    // Queue is empty — mark any processing campaigns as completed
-    console.log("Email queue drained");
+        await finalizeCampaignIfDone(job.data.campaignId);
+    }
 });

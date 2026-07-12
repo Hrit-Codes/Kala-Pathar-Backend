@@ -1,18 +1,7 @@
-import nodemailer from "nodemailer";
+import { transporter } from "../config/email";
 import { loadEnv } from "../config/env";
 import { ApiError } from "../utils/apiError";
 
-const transporter= nodemailer.createTransport(
-    {
-        secure:true,
-        host:"smtp.gmail.com",
-        port:465,
-        auth:{
-            user:loadEnv.EMAIL_USER,
-            pass:loadEnv.EMAIL_PASS
-        }
-    }
-)
 
 interface SendMailOptions {
     to: string;
