@@ -88,9 +88,13 @@ export const checkSubscriptionStatus=asyncHandler(async(req:Request,res:Response
     })
 })
 
-export const unsubscribeByEmail=asyncHandler(async(req:Request,res:Response)=>{
-    const { email }=req.body;
+export const unsubscribe=asyncHandler(async(req:Request,res:Response)=>{
+    const { email , token }=req.body;
     if(!email){
+        throw new ApiError(400,"Email is required");
+    }
+
+    if(!token){
         throw new ApiError(400,"Email is required");
     }
 
@@ -113,6 +117,10 @@ export const unsubscribeByEmail=asyncHandler(async(req:Request,res:Response)=>{
             message:"You are already unsubscribed",
             data:{isSubscribed:false}
         })
+    }
+
+    if(subscriber.unsubscribeToken!==token){
+        throw new ApiError(401,"Invalid or expired unsubscribe token");
     }
 
     subscriber.isActive=false;
