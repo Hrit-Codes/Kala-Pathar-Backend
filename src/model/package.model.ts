@@ -7,13 +7,12 @@ export const CURRENCIES = [
 
 export type Currency = typeof CURRENCIES[number];
 
-export type PriceLabel = "per person" | "per group" | "per vehicle" | "per trip";
+export type PriceLabel = "per person" | "per group" | "per vehicle" ;
 
 export const PRICE_LABELS: PriceLabel[] = [
     "per person",
     "per group",
     "per vehicle",
-    "per trip",
 ];
 
 export interface ISupportContact {
@@ -226,6 +225,5 @@ travelPackageSchema.index({ price: 1 });
 travelPackageSchema.index({ durationDays: 1 });
 travelPackageSchema.index({ isFeatured: 1 });
 travelPackageSchema.index({ createdAt: -1 });
-travelPackageSchema.index({ slug: 1 });
 
 export const TravelPackage = mongoose.model<ITravelPackage>("TravelPackage", travelPackageSchema);

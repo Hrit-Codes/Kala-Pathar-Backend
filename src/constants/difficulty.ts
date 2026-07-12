@@ -1,6 +1,6 @@
 export const DIFFICULTY_LEVELS = [
   {
-    name: "Beginner",
+    name: "beginner",
     color: "#10b981",
     level: 1,
   },
