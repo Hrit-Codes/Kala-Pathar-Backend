@@ -1,5 +1,4 @@
 import { Queue } from "bullmq";
-import { redisClient } from "../config/redis";
 
 export interface EmailJobData {
     campaignId: string;
