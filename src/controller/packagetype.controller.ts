@@ -2,6 +2,14 @@ import { Request, Response } from "express";
 import { ApiError } from "../utils/apiError";
 import { asyncHandler } from "../utils/asyncHandler";
 import { PackageType } from "../model/packageTypeModel";
+import { redisClient } from "../config/redis";
+
+const PACKAGE_TYPES_CACHE_TTL = 30 * 60;
+const PACKAGE_TYPES_CACHE_KEY = "packageTypes:all";
+
+const invalidatePackageTypesCache = async () => {
+    await redisClient.del(PACKAGE_TYPES_CACHE_KEY);
+};
 
 export const createPackageType = asyncHandler(async (req: Request, res: Response) => {
     const { name, icon, themeColor, description, hasDifficultyLevels, order, isActive } = req.body;
@@ -37,6 +45,8 @@ export const createPackageType = asyncHandler(async (req: Request, res: Response
         isActive
     });
 
+    await invalidatePackageTypesCache();
+
     return res.status(201).json({
         success: true,
         message: "Package type created successfully",
@@ -58,6 +68,8 @@ export const deletePackageType = asyncHandler(async (req: Request, res: Response
     }
 
     await PackageType.findByIdAndDelete(id);
+
+    await invalidatePackageTypesCache();
 
     return res.status(200).json({
         success: true,
@@ -90,10 +102,12 @@ export const toggleActiveStatus = asyncHandler(async (req: Request, res: Respons
             updatedAt: new Date(),
         },
         {
-            new: true,
+            returnDocument: "after",
             runValidators: true
         }
     );
+
+    await invalidatePackageTypesCache();
 
     const statusMessage = updatedPackageType?.isActive ? "activated" : "deactivated";
 
@@ -143,10 +157,12 @@ export const updatePackageType = asyncHandler(async (req: Request, res: Response
         id,
         updateData,
         {
-            new: true,
+            returnDocument: "after",
             runValidators: true,
         }
     );
+
+    await invalidatePackageTypesCache();
 
     return res.status(200).json({
         success: true,
@@ -175,31 +191,34 @@ export const getPackageTypeById = asyncHandler(async (req: Request, res: Respons
     });
 });
 
+// ✅ Updated: No pagination, returns all package types
 export const getPackageTypes = asyncHandler(async (req: Request, res: Response) => {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 10;
+    // Check cache first
+    const cached = await redisClient.get(PACKAGE_TYPES_CACHE_KEY);
 
-    const skip = (page - 1) * limit;
+    if (cached) {
+        return res.status(200).json({
+            success: true,
+            message: "Package types fetched successfully (cached)",
+            data: JSON.parse(cached),
+        });
+    }
 
-    const [packageTypes, total] = await Promise.all([
-        PackageType.find()
-            .sort({ order: 1, createdAt: -1 })
-            .skip(skip)
-            .limit(limit),
-        PackageType.countDocuments()
-    ]);
+    // Fetch all package types from database
+    const packageTypes = await PackageType.find()
+        .sort({ order: 1, createdAt: -1 });
+
+    // Cache the result
+    await redisClient.set(
+        PACKAGE_TYPES_CACHE_KEY,
+        JSON.stringify(packageTypes),
+        "EX",
+        PACKAGE_TYPES_CACHE_TTL
+    );
 
     return res.status(200).json({
         success: true,
         message: "Package types fetched successfully",
         data: packageTypes,
-        pagination: {
-            total,
-            page,
-            limit,
-            totalPages: Math.ceil(total / limit),
-            hasNextPage: page * limit < total,
-            hasPrevPage: page > 1
-        }
     });
 });

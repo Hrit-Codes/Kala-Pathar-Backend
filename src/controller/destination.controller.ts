@@ -90,7 +90,7 @@ export const toggleDestinationActiveStatus = asyncHandler(async (req: Request, r
             updatedAt: new Date(),
         },
         {
-            new: true,
+            returnDocument: "after",
             runValidators: true
         }
     );
@@ -142,7 +142,7 @@ export const updateDestination = asyncHandler(async (req: Request, res: Response
         id,
         updateData,
         {
-            new: true,
+            returnDocument: "after",
             runValidators: true,
         }
     );

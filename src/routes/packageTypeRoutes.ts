@@ -1,13 +1,15 @@
 import { Router } from "express";
 import { createPackageType, deletePackageType, getPackageTypeById, getPackageTypes, toggleActiveStatus, updatePackageType } from "../controller/packagetype.controller";
 import { isAdmin, isAuthenticated } from "../middleware/auth.middleware";
+import { validate } from "../middleware/validate.middleware";
+import { createPackageTypeSchema, updatePackageTypeSchema } from "../validator/packageType.validate";
 
 const router=Router();
 
-router.post("/create",isAuthenticated,isAdmin,createPackageType);
+router.post("/create",isAuthenticated,isAdmin,validate(createPackageTypeSchema), createPackageType);
 router.delete("/delete/:id",isAuthenticated,isAdmin,deletePackageType);
 router.patch("/toggleActiveStatus/:id",isAuthenticated,isAdmin,toggleActiveStatus);
-router.put("/updatePackageType/:id",isAuthenticated,isAdmin,updatePackageType);
+router.put("/updatePackageType/:id",isAuthenticated,isAdmin,validate(updatePackageTypeSchema), updatePackageType);
 router.get("/getPackageTypeById/:id",isAuthenticated,isAdmin,getPackageTypeById);
 router.get("/getPackageTypes",getPackageTypes);
 

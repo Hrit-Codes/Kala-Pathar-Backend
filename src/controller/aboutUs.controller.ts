@@ -209,7 +209,7 @@ export const updateAboutUs = asyncHandler(async (req: Request, res: Response) =>
     const updatedAboutUs = await AboutUs.findByIdAndUpdate(
         existing._id,
         updateData,
-        { new: true, runValidators: true }
+        { returnDocument: "after", runValidators: true }
     ).select(
         "-heroImagePublicId -heroImageLocalPath -ceoQuote.ceoPhotoPublicId -ceoQuote.ceoPhotoLocalPath"
     );
