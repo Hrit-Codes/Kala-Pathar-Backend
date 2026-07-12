@@ -84,7 +84,7 @@ export const updateGallery = asyncHandler(async (req: Request, res: Response) =>
     updateData.updatedAt = new Date();
 
     const updatedGallery = await Gallery.findByIdAndUpdate(id, updateData, {
-        new: true,
+        returnDocument: "after",
         runValidators: true,
     }).select("-imagePublicId -imageLocalPath -imageLocalUrl");
     

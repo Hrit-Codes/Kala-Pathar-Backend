@@ -100,7 +100,7 @@ export const updatePartnerSection = asyncHandler(async (req: Request, res: Respo
     const updated = await PartnerSection.findByIdAndUpdate(
         existing._id,
         updateData,
-        { new: true, runValidators: true }
+        { returnDocument: "after", runValidators: true }
     );
 
     await redisClient.del(PARTNER_CACHE_KEY);
@@ -148,7 +148,7 @@ export const addAffiliation = asyncHandler(async (req: Request, res: Response) =
     const updated = await PartnerSection.findByIdAndUpdate(
         existing._id,
         { $push: { affiliations: newAffiliation } },
-        { new: true, runValidators: true }
+        { returnDocument: "after", runValidators: true }
     );
 
     await redisClient.del(PARTNER_CACHE_KEY);
@@ -201,7 +201,7 @@ export const updateAffiliation = asyncHandler(async (req: Request, res: Response
     const updated = await PartnerSection.findOneAndUpdate(
         { "affiliations._id": id },
         { $set: affiliationUpdate },
-        { new: true, runValidators: true }
+        { returnDocument: "after", runValidators: true }
     );
 
     await redisClient.del(PARTNER_CACHE_KEY);
@@ -239,7 +239,7 @@ export const deleteAffiliation = asyncHandler(async (req: Request, res: Response
     const updated = await PartnerSection.findByIdAndUpdate(
         existing._id,
         { $pull: { affiliations: { _id: id } } },
-        { new: true }
+        { returnDocument: "after" }
     );
 
     await redisClient.del(PARTNER_CACHE_KEY);
