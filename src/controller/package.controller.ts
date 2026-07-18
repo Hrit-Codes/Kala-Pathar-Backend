@@ -568,7 +568,9 @@ export const getTopPackages=asyncHandler(async(req:Request,res:Response)=>{
     const topPackages=await TravelPackage.find({isActive:true})
         .sort({views:-1})
         .limit(3)
-        .select("title slug thumbnail price currency durationDays difficulty isFeatured packageType destination");
+        .select("title slug thumbnail price currency durationDays difficulty isFeatured packageType destination")
+        .populate("packageType","name slug icon themeColor description")
+        .populate("destination","name slug description");
 
     const data= topPackages.map((pkg)=>({
         ...pkg.toObject(),
