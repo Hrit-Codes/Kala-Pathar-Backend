@@ -21,6 +21,7 @@ const getPackagesCacheKey=(query:Record<string,string | undefined>)=>
 const invalidatePackagesCache=async()=>{
     const keys=await redisClient.keys("packages:active:*");
     if(keys.length>0) await redisClient.del(...keys);
+    await redisClient.del("packages:top3");
 }
 
 const parse = (field: any) =>
@@ -550,3 +551,40 @@ export const getTravelPackageById = asyncHandler(async (req: Request, res: Respo
         }),
     });
 });
+
+export const getTopPackages=asyncHandler(async(req:Request,res:Response)=>{
+    const TOP_PACKAGES_CACHE_KEY="packages:top3";
+
+    const cached=await redisClient.get(TOP_PACKAGES_CACHE_KEY);
+
+    if(cached){
+        return res.status(200).json({
+            success:true,
+            message:"Top packages fetched successfully",
+            data:JSON.parse(cached)
+        })
+    }
+
+    const topPackages=await TravelPackage.find({isActive:true})
+        .sort({views:-1})
+        .limit(3)
+        .select("title slug thumbnail price currency durationDays difficulty isFeatured packageType destination");
+
+    const data= topPackages.map((pkg)=>({
+        ...pkg.toObject(),
+        thumbnail:pkg.thumbnail
+    }));
+
+    await redisClient.set(
+        TOP_PACKAGES_CACHE_KEY,
+        JSON.stringify(data),
+        "EX",
+        5*60
+    );
+
+    return res.status(200).json({
+        success:true,
+        message:"Top packages fetched successfully",
+        data,
+    });
+})

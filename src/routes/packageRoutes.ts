@@ -12,6 +12,7 @@ import {
     getAllTravelPackages,
     getAllActiveTravelPackages,
     getTravelPackageById,
+    getTopPackages,
 } from "../controller/package.controller";
 import {
     createTravelPackageSchema,
@@ -58,5 +59,6 @@ router.patch("/active/:id", isAuthenticated, isAdmin, toggleActiveStatus);
 //Admin - Get
 router.get("/getAllPackages",isAuthenticated,isAdmin,getAllTravelPackages);
 router.get(`/:id`,isAuthenticated,isAdmin,getTravelPackageById);
+router.get("/top",isAuthenticated,isAdmin,getTopPackages);
 
 export default router;
