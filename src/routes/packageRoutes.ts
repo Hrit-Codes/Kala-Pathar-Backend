@@ -58,7 +58,7 @@ router.patch("/active/:id", isAuthenticated, isAdmin, toggleActiveStatus);
 
 //Admin - Get
 router.get("/getAllPackages",isAuthenticated,isAdmin,getAllTravelPackages);
-router.get(`/:id`,isAuthenticated,isAdmin,getTravelPackageById);
 router.get("/top",isAuthenticated,isAdmin,getTopPackages);
+router.get(`/:id`,isAuthenticated,isAdmin,getTravelPackageById);
 
 export default router;
