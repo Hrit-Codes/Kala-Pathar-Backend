@@ -68,8 +68,8 @@ const createDefaultAdmin = async () => {
     try {
       await sendMail({
         to: process.env.ADMIN_EMAIL!,
-        sub: "Admin Account Created Successfully",
-        msg: `<h1>Welcome ${adminData.name}</h1>
+        subject: "Admin Account Created Successfully",
+        html: `<h1>Welcome ${adminData.name}</h1>
               <p>Your admin account has been successfully created.</p>
               <p><strong>Email:</strong> ${adminData.email}</p>
               <p><strong>Role:</strong> Admin</p>
