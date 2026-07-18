@@ -8,7 +8,10 @@
     "redis:flush": "docker exec -it redis redis-cli FLUSHALL",
     "redis:keys": "docker exec -it redis redis-cli KEYS *",
     "redis:check": "docker exec -it redis redis-cli GET gallery:all",
-    "dev": "nodemon src/index.ts"
+    "seed:admin": "tsx src/utils/seedAdmin.ts", 
+    "dev": "nodemon --exec tsx src/index.ts",
+    "build":"tsc --project tsconfig.json",
+    "start": "node dist/index.js"
   },
   "keywords": [],
   "author": "",
@@ -24,6 +27,7 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "ioredis": "^5.11.1",
+    "joi": "^18.2.3",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.6.2",
     "multer": "^2.2.0",
@@ -39,6 +43,7 @@
     "@types/nodemailer": "^8.0.1",
     "nodemon": "^3.1.14",
     "ts-node": "^10.9.2",
-    "tsx": "^4.22.4"
+    "tsx": "^4.23.1",
+    "typescript": "^7.0.2"
   }
 }
