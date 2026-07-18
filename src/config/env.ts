@@ -35,7 +35,7 @@ class configModule {
         this.MONGO_URL=this.validateRequired('MONGO_URL',process.env.MONGO_URL);
         this.ACCESS_TOKEN_SECRET=this.validateRequired("ACCESS_TOKEN_SECRET",process.env.ACCESS_TOKEN_SECRET);
         this.REFRESH_TOKEN_SECRET=this.validateRequired("REFRESH_TOKEN_SECRET",process.env.REFRESH_TOKEN_SECRET);
-        this.ACCESS_TOKEN_EXPIRY=this.validateRequired("REFRESH_TOKEN_SECRET",process.env.ACCESS_TOKEN_EXPIRY);
+        this.ACCESS_TOKEN_EXPIRY=this.validateRequired("ACCESS_TOKEN_EXPIRY",process.env.ACCESS_TOKEN_EXPIRY);
         this.EMAIL_USER = this.validateRequired("EMAIL_USER", process.env.EMAIL_USER);
         this.EMAIL_PASS = this.validateRequired("EMAIL_PASS", process.env.EMAIL_PASS);
         this.ADMIN_EMAIL= this.validateRequired("ADMIN_EMAIL",process.env.ADMIN_EMAIL);

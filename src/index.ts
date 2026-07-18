@@ -18,9 +18,9 @@ import packageRoutes from "./routes/packageRoutes";
 import inquiryRoutes from "./routes/inquiryRoutes";
 import subscriberRoutes from "./routes/subscriberRoutes";
 import campaignRoutes from "./routes/campaignRoutes";
+import analyticsRoutes from "./routes/analyticsRoutes";
 import path from "path";
 import { globalRateLimiter } from "./middleware/rateLimiter.middleware";
-import { verifyEmailConnection } from "./config/email";
 import "./queue/emailWorker";
 
 dotenv.config();
@@ -53,6 +53,7 @@ app.use("/api/public",express.static("public"));
 
 app.use(globalRateLimiter) // Global rate limiting to protect from bots // Applies to every routes below this line
 
+app.use("/api/analytics",analyticsRoutes);
 app.use("/api/auth",authRoutes);
 app.use("/api/destination",destinationRoutes);
 app.use("/api/packagetype",packagetypeRoutes);
