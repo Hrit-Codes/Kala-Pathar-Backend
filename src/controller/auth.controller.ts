@@ -87,8 +87,8 @@ export const authLogout = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .clearCookie("accessToken", cookieOptions)
-    .clearCookie("refreshToken",cookieOptions)
+    .clearCookie("access_token", cookieOptions)
+    .clearCookie("refresh_token", cookieOptions)
     .json({
       success: true,
       message: "Logout successful",
