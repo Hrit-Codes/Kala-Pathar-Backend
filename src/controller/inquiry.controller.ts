@@ -131,11 +131,13 @@ export const getAllInquiry=asyncHandler(async(req:Request,res:Response)=>{
     const cached=await redisClient.get(cacheKey);
 
     if (cached){
+        const parsedCache=JSON.parse(cached);
         return res.status(200).json({
             success:true,
             message:"Inquiries fetched successfully",
-            data:JSON.parse(cached).inquiries,
-            pagination:JSON.parse(cached).pagination
+            data:parsedCache.inquiries,
+            pagination:parsedCache.pagination,
+            tabCounts:parsedCache.tabCounts
         })
     }
 

@@ -9,6 +9,6 @@ router.post("/login",loginRateLimiter, authLogin);
 
 router.post("/logout",isAuthenticated, authLogout);
 
-router.get("/refreshAccessToken",isAuthenticated, refreshAccessToken);
+router.post("/refreshAccessToken", refreshAccessToken);
 
 export default router;
