@@ -1,6 +1,8 @@
 # Hidden credentials
 .env
 .env.local
+.env.development
+.env.production
 
 #Server Images and Videos
 /uploads/
