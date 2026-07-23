@@ -4,14 +4,32 @@
   "main": "index.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "redis:clear": "docker exec -it redis redis-cli DEL gallery:all",
-    "redis:flush": "docker exec -it redis redis-cli FLUSHALL",
-    "redis:keys": "docker exec -it redis redis-cli KEYS *",
-    "redis:check": "docker exec -it redis redis-cli GET gallery:all",
-    "seed:admin": "tsx src/utils/seedAdmin.ts", 
+    
+    "seed:admin": "tsx src/utils/seedAdmin.ts",
     "dev": "nodemon --exec tsx src/index.ts",
-    "build":"tsc --project tsconfig.json",
-    "start": "node dist/index.js"
+    "build": "tsc --project tsconfig.json",
+    
+    "start": "NODE_ENV=production node dist/index.js",
+    "start:dev": "NODE_ENV=development node dist/index.js",
+    "start:prod": "NODE_ENV=production node dist/index.js",
+    
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop kala-pathar-backend",
+    "pm2:restart": "pm2 restart kala-pathar-backend",
+    "pm2:logs": "pm2 logs kala-pathar-backend",
+    "pm2:list": "pm2 list",
+    
+    "docker:build": "docker build -t kala-pathar-backend .",
+    "docker:run": "docker run -d -p 5010:5000 --env-file .env.production --name kala-backend kala-pathar-backend",
+    "docker:stop": "docker stop kala-backend && docker rm kala-backend",
+    "docker:logs": "docker logs kala-backend -f",
+    "docker:exec": "docker exec -it kala-backend sh",
+    
+    "compose:up": "docker-compose up -d",
+    "compose:up:build": "docker-compose up -d --build",
+    "compose:down": "docker-compose down",
+    "compose:logs": "docker-compose logs -f",
+    "compose:rebuild": "docker-compose down && docker-compose up -d --build"
   },
   "keywords": [],
   "author": "",
