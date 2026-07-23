@@ -1,7 +1,6 @@
 import express from "express";
 import dns from "dns";
 dns.setServers(['8.8.8.8', '8.8.4.4']);
-import dotenv from "dotenv";
 import cors from "cors";
 import { loadEnv } from "./config/env";
 import { dbConnection } from "./db";
@@ -22,8 +21,6 @@ import analyticsRoutes from "./routes/analyticsRoutes";
 import path from "path";
 import { globalRateLimiter } from "./middleware/rateLimiter.middleware";
 import "./queue/emailWorker";
-
-dotenv.config();
 
 const app=express();
 const port=Number(loadEnv.PORT) || 3000;

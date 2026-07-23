@@ -22,12 +22,12 @@ const subscriberSchema= new mongoose.Schema(
             type:Boolean,
             default:true
         },
-        unsubscribeToken: {
-            type: String,
-            required: true,
-            unique: true,
-            default: () => crypto.randomBytes(32).toString("hex"),
-        },
+        // unsubscribeToken: {
+        //     type: String,
+        //     required: true,
+        //     unique: true,
+        //     default: () => crypto.randomBytes(32).toString("hex"),
+        // },
         subscribedAt:{
             type:Date,
             default:Date.now,
