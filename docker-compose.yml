@@ -1,0 +1,53 @@
+# docker-compose.yml
+# ✅ Remove this line: version: "3.9"
+
+services:
+  # Backend Service
+  backend:
+    build: .
+    container_name: kala-pathar-backend
+    ports:
+      - "5010:5010"
+    env_file:
+      - .env.production
+    environment:
+      - NODE_ENV=production
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_URL=redis://redis:6379
+      - PORT=5010
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - ./logs:/app/logs
+      - ./uploads:/app/uploads
+    networks:
+      - kala-network
+
+  # Redis Service
+  redis:
+    image: redis:alpine
+    container_name: redis
+    ports:
+      - "6381:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kala-network
+    volumes:
+      - redis-data:/data
+
+# Volumes for persistent data
+volumes:
+  redis-data:
+
+# Network for service communication
+networks:
+  kala-network:
+    driver: bridge
