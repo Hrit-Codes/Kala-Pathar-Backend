@@ -26,8 +26,10 @@ const app=express();
 const port=Number(loadEnv.PORT) || 3000;
 const hostname=process.env.HOST || "localhost";
 
+const corsOrigins = loadEnv.CORS_ORIGIN.split(",").map((origin) => origin.trim());
+
 app.use(cors({
-    origin: ["http://localhost:3000",'http://localhost:3001', 'http://192.168.1.90:3000'],
+    origin: corsOrigins,
     credentials: true,
     methods:["GET","POST","PATCH","PUT","DELETE"],
     allowedHeaders:["Content-Type","Authorization","Accept"]
