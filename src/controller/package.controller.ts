@@ -22,6 +22,7 @@ const invalidatePackagesCache=async()=>{
     const keys=await redisClient.keys("packages:active:*");
     if(keys.length>0) await redisClient.del(...keys);
     await redisClient.del("packages:top3");
+    await redisClient.del("packages:featured");
 }
 
 const parse = (field: any) =>
@@ -587,6 +588,44 @@ export const getTopPackages=asyncHandler(async(req:Request,res:Response)=>{
     return res.status(200).json({
         success:true,
         message:"Top packages fetched successfully",
+        data,
+    });
+})
+
+export const getFeaturedPackages=asyncHandler(async(req:Request,res:Response)=>{
+    const FEATURED_PACKAGES_CACHE_KEY="packages:featured";
+
+    const cached=await redisClient.get(FEATURED_PACKAGES_CACHE_KEY);
+
+    if(cached){
+        return res.status(200).json({
+            success:true,
+            message:"Featured packages fetched successfully",
+            data:JSON.parse(cached)
+        })
+    }
+
+    const featuredPackages=await TravelPackage.find({isActive:true,isFeatured:true})
+        .sort({createdAt:-1})
+        .select("title slug badge overviewTitle description thumbnail price currency durationDays difficulty isFeatured packageType destination")
+        .populate("packageType","name slug icon themeColor description")
+        .populate("destination","name slug description");
+
+    const data=featuredPackages.map((pkg)=>({
+        ...pkg.toObject(),
+        thumbnail:pkg.thumbnail
+    }));
+
+    await redisClient.set(
+        FEATURED_PACKAGES_CACHE_KEY,
+        JSON.stringify(data),
+        "EX",
+        5*60
+    );
+
+    return res.status(200).json({
+        success:true,
+        message:"Featured packages fetched successfully",
         data,
     });
 })
