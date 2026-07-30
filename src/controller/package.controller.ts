@@ -427,7 +427,9 @@ export const getAllActiveTravelPackages = asyncHandler(async (req: Request, res:
             .sort({ [sortField]: sortDirection })
             .skip(skip)
             .limit(limitNum)
-            .select("-thumbnailPublicId -thumbnailLocalPath -thumbnailLocalUrl -galleryPublicIds -galleryLocalPaths -galleryLocalUrls"),
+            .select(
+                "title slug badge thumbnail price currency priceLabel durationDays difficulty groupSize isFeatured isActive views packageType destination"
+            ),
         TravelPackage.countDocuments(filter),
         TravelPackage.countDocuments({ isFeatured: true }),
     ]);
