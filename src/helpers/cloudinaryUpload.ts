@@ -107,6 +107,17 @@ export const uploadVideoToCloud = async (
     });
 };
 
+// Dispatches to the image or video uploader based on mediaType — for fields where either kind is accepted (e.g. hero section background)
+export const uploadMediaToCloud = async (
+    file: Express.Multer.File,
+    folder: string,
+    mediaType: "image" | "video"
+): Promise<UploadResult> => {
+    return mediaType === "video"
+        ? uploadVideoToCloud(file, folder)
+        : uploadImageToCloud(file, folder);
+};
+
 export const deleteFromCloud = async (
     publicId: string, // Cloudinary public id
     localPath: string, // Local file path
