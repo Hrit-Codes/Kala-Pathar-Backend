@@ -58,6 +58,28 @@ export const uploadVideo= multer({
     limits:{fileSize: 100*1024*1024}
 })
 
+const mediaFileFilter = (
+    req: Express.Request,
+    file: Express.Multer.File,
+    cb: multer.FileFilterCallback,
+) => {
+    const allowedTypes = [
+        "image/jpeg", "image/png", "image/webp",
+        "video/mp4", "video/webm", "video/quicktime",
+    ];
+    if (!allowedTypes.includes(file.mimetype)) {
+        return cb(new ApiError(400, "Only JPEG, PNG, WEBP images or MP4, WEBM, MOV videos are allowed") as any);
+    }
+    cb(null, true);
+}
+
+// Accepts either an image or a video in a single field — used where mediaType decides the kind (e.g. hero section background)
+export const uploadMedia = multer({
+    storage: diskStorage,
+    fileFilter: mediaFileFilter,
+    limits: { fileSize: 100 * 1024 * 1024 },
+})
+
 export const uploadCampaignAttachments = multer({
     storage: diskStorage,
     limits: { fileSize: 10 * 1024 * 1024 }, 
