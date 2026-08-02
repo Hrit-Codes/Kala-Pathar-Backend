@@ -176,7 +176,7 @@ export const getDestinationById = asyncHandler(async (req: Request, res: Respons
     });
 });
 
-export const getDestinations = asyncHandler(async (req: Request, res: Response) => {
+export const getAllDestinations = asyncHandler(async (req: Request, res: Response) => {
     // Check cache first
     const cached = await redisClient.get(DESTINATIONS_CACHE_KEY);
 
@@ -206,3 +206,32 @@ export const getDestinations = asyncHandler(async (req: Request, res: Response) 
         data: destinations,
     });
 });
+
+export const getActiveDestinations=asyncHandler(async(req:Request,res:Response)=>{
+    const cached=await redisClient.get("destinations:active");
+
+    if(cached){
+        return res.status(200).json({
+            success:true,
+            message:"Active destinations fetched successfully",
+            ...JSON.parse(cached)
+        });
+    }
+
+    const destinations=await Destination.find({isActive:true})
+            .sort({order:1,createdAt:-1})
+            .select("_id name slug description");
+
+    const responsePayload={
+        data:destinations,
+        total:destinations.length
+    }
+
+    await redisClient.set("destinations:active",JSON.stringify(responsePayload),"EX",DESTINATIONS_CACHE_TTL);
+
+    return res.status(200).json({
+        success:true,
+        message:"ACtive destinations fetched successfully",
+        ...responsePayload
+    })
+})
