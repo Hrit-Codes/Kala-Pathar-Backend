@@ -192,7 +192,7 @@ export const getPackageTypeById = asyncHandler(async (req: Request, res: Respons
 });
 
 // ✅ Updated: No pagination, returns all package types
-export const getPackageTypes = asyncHandler(async (req: Request, res: Response) => {
+export const getAllPackageTypes = asyncHandler(async (req: Request, res: Response) => {
     // Check cache first
     const cached = await redisClient.get(PACKAGE_TYPES_CACHE_KEY);
 
@@ -220,5 +220,40 @@ export const getPackageTypes = asyncHandler(async (req: Request, res: Response) 
         success: true,
         message: "Package types fetched successfully",
         data: packageTypes,
+    });
+});
+
+export const getActivePackageTypes = asyncHandler(async (req: Request, res: Response) => {
+    const ACTIVE_CACHE_KEY = "packagetypes:active";
+
+    const cached = await redisClient.get(ACTIVE_CACHE_KEY);
+    if (cached) {
+        return res.status(200).json({
+            success: true,
+            message: "Active package types fetched successfully",
+            ...JSON.parse(cached),
+        });
+    }
+
+    const packageTypes = await PackageType.find({ isActive: true })
+        .sort({ order: 1, createdAt: -1 })
+        .select("_id name slug icon themeColor description hasDifficultyLevels");
+
+    const responsePayload = {
+        data: packageTypes,
+        total: packageTypes.length,
+    };
+
+    await redisClient.set(
+        ACTIVE_CACHE_KEY,
+        JSON.stringify(responsePayload),
+        "EX",
+        5 * 60
+    );
+
+    return res.status(200).json({
+        success: true,
+        message: "Active package types fetched successfully",
+        ...responsePayload,
     });
 });
