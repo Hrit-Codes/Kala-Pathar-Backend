@@ -19,6 +19,7 @@ import subscriberRoutes from "./routes/subscriberRoutes";
 import campaignRoutes from "./routes/campaignRoutes";
 import analyticsRoutes from "./routes/analyticsRoutes";
 import heroSectionRoutes from "./routes/heroSectionRoutes";
+import testimonialRoutes from "./routes/testimonialRoutes";
 import path from "path";
 import { globalRateLimiter } from "./middleware/rateLimiter.middleware";
 import "./queue/emailWorker";
@@ -69,6 +70,7 @@ app.use("/api/inquiry",inquiryRoutes);
 app.use("/api/subscriber",subscriberRoutes);
 app.use("/api/campaign",campaignRoutes);
 app.use("/api/herosection",heroSectionRoutes);
+app.use("/api/testimonial",testimonialRoutes)
 
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
