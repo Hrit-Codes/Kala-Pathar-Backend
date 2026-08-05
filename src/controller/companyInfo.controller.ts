@@ -35,7 +35,7 @@ export const createCompanyInfo = asyncHandler(async (req: Request, res: Response
         phones: typeof phones === "string" ? JSON.parse(phones) : phones,
         description,
         logo: uploadedLogo.cloudinaryUrl || uploadedLogo.localUrl,  
-        logoPublicId: uploadedLogo.cloudinaryPublicId,               
+        logoPublicId: uploadedLogo.cloudinaryPublicId || "",               
         logoLocalPath: uploadedLogo.localPath,                       
         logoLocalUrl: uploadedLogo.localUrl,                      
         socialLinks: typeof socialLinks === "string" ? JSON.parse(socialLinks) : socialLinks,
@@ -107,7 +107,7 @@ export const updateCompanyInfo = asyncHandler(async (req: Request, res: Response
     if (companyName) updateData.companyName = companyName.trim();
     if (officeAddress) updateData.officeAddress = officeAddress.trim();
     if (officeTelephone) updateData.officeTelephone = officeTelephone.trim();
-    if (description) updateData.description = description.trim();
+    if (description!==undefined) updateData.description = description.trim();
 
     if (emails !== undefined) {
         updateData.emails = typeof emails === "string" ? JSON.parse(emails) : emails;
@@ -127,7 +127,7 @@ export const updateCompanyInfo = asyncHandler(async (req: Request, res: Response
         const uploadedLogo = await uploadImageToCloud(req.file, "company");
 
         updateData.logo = uploadedLogo.cloudinaryUrl || uploadedLogo.localUrl; 
-        updateData.logoPublicId = uploadedLogo.cloudinaryPublicId;            
+        updateData.logoPublicId = uploadedLogo.cloudinaryPublicId || "";            
         updateData.logoLocalPath = uploadedLogo.localPath;                     
         updateData.logoLocalUrl = uploadedLogo.localUrl;                  
 
@@ -144,7 +144,7 @@ export const updateCompanyInfo = asyncHandler(async (req: Request, res: Response
     const updatedCompanyInfo = await CompanyInfo.findByIdAndUpdate(
         existing._id,
         updateData,
-        { returnDocument: "after", runValidators: true }
+        { new:true, runValidators: true }
     );
 
     await redisClient.del(COMPANY_INFO_CACHE_KEY);
@@ -176,6 +176,8 @@ export const deleteCompanyInfo = asyncHandler(async (req: Request, res: Response
     return res.status(200).json({
         success: true,
         message: "Company info deleted successfully",
-        deletedAt: new Date(),
+        data:{
+            deletedAt:new Date(),
+        }
     });
 });
