@@ -8,10 +8,24 @@ import { redisClient } from "../config/redis";
 
 const MAX_HERO_SECTIONS = 8;
 const HERO_CACHE_KEY = "hero:sections";
+const HERO_ACTIVE_CACHE_KEY = "hero:active";
 const HERO_CACHE_TTL = 5 * 60;
 
+const invalidateHeroCache = async () => {
+    await Promise.all([
+        redisClient.del(HERO_CACHE_KEY),
+        redisClient.del(HERO_ACTIVE_CACHE_KEY),
+    ]);
+};
+
+const parseBoolean = (value: unknown, defaultValue: boolean = true): boolean => {
+    if (value === undefined || value === null) return defaultValue;
+    if (typeof value === "boolean") return value;
+    return String(value).trim().toLowerCase() === "true";
+};
+
 const resolveOrderConflict = async (order: number, excludeId?: string | string[]) => {
-    const conflictFilter: any = excludeId ? { _id: { $ne: excludeId } } : {};
+    const conflictFilter: Record<string, unknown> = excludeId ? { _id: { $ne: excludeId } } : {};
 
     const conflictExists = await HeroSection.exists({ ...conflictFilter, order });
     if (!conflictExists) return;
@@ -22,6 +36,7 @@ const resolveOrderConflict = async (order: number, excludeId?: string | string[]
     );
 };
 
+// ─── CREATE ───────────────────────────────────────────────────────────────────
 export const createHeroSection = asyncHandler(async (req: Request, res: Response) => {
     const existingCount = await HeroSection.countDocuments();
     if (existingCount >= MAX_HERO_SECTIONS) {
@@ -60,19 +75,19 @@ export const createHeroSection = asyncHandler(async (req: Request, res: Response
         secondaryButtonLink: secondaryButtonLink?.trim(),
         mediaType,
         mediaUrl:            uploaded.cloudinaryUrl || uploaded.localUrl,
-        mediaPublicId:       uploaded.cloudinaryPublicId,
+        // ─── Fix #3: Fallback || "" for mediaPublicId ───────────────────────
+        mediaPublicId:       uploaded.cloudinaryPublicId || "",
         mediaLocalPath:      uploaded.localPath,
         mediaLocalUrl:       uploaded.localUrl,
         textAlignment:       textAlignment ?? "left",
         overlayColor:        overlayColor ?? "#000000",
         overlayOpacity:      overlayOpacity !== undefined ? Number(overlayOpacity) : 40,
-        isActive:            isActive !== undefined
-                                 ? JSON.parse(String(isActive))
-                                 : true,
+        // ─── Fix #4: Safe boolean parsing ─────────────────────────────────────
+        isActive:            parseBoolean(isActive, true),
         order:               requestedOrder,
     });
 
-    await redisClient.del(HERO_CACHE_KEY);
+    await invalidateHeroCache();
 
     const totalAfterCreate = await HeroSection.countDocuments();
 
@@ -84,6 +99,7 @@ export const createHeroSection = asyncHandler(async (req: Request, res: Response
     });
 });
 
+// ─── GET ALL (Admin) ──────────────────────────────────────────────────────────
 export const getAllHeroSections = asyncHandler(async (req: Request, res: Response) => {
     const cached = await redisClient.get(HERO_CACHE_KEY);
     if (cached) {
@@ -124,45 +140,46 @@ export const getAllHeroSections = asyncHandler(async (req: Request, res: Respons
     });
 });
 
-export const getActiveHeroSections=asyncHandler(async(req:Request,res:Response)=>{
-    const cached=await redisClient.get("hero:active");
-    if(cached){
+// ─── GET ACTIVE (Public) ──────────────────────────────────────────────────────
+export const getActiveHeroSections = asyncHandler(async (req: Request, res: Response) => {
+    const cached = await redisClient.get(HERO_ACTIVE_CACHE_KEY);
+    if (cached) {
         return res.status(200).json({
-            success:true,
-            message:"Active hero sections fetched successfully",
-            ...JSON.parse(cached)
+            success: true,
+            message: "Active hero sections fetched successfully",
+            ...JSON.parse(cached),
         });
     }
 
-    const heroSections=await HeroSection.find({isActive:true})
-    .sort({order:1,createdAt:-1})
-    .select("-mediaPublicId -mediaLocalPath");
+    const heroSections = await HeroSection.find({ isActive: true })
+        .sort({ order: 1, createdAt: -1 })
+        .select("-mediaPublicId -mediaLocalPath");
 
-    const resolved=await Promise.all(
-        heroSections.map(async(section)=>{
-            const data=section.toObject();
+    const resolved = await Promise.all(
+        heroSections.map(async (section) => {
+            const data = section.toObject();
             return ImageResolver.prepare({
                 ...data,
-                mediaUrl:await ImageResolver.resolveSingle(data.mediaUrl, data.mediaLocalUrl),
+                mediaUrl: await ImageResolver.resolveSingle(data.mediaUrl, data.mediaLocalUrl),
             });
         })
     );
 
-    const responsePayload={
-        data:resolved,
-        total:resolved.length,
-    }
+    const responsePayload = {
+        data: resolved,
+        total: resolved.length,
+    };
 
-    await redisClient.set("hero:active",JSON.stringify(responsePayload),"EX",HERO_CACHE_TTL);
+    await redisClient.set(HERO_ACTIVE_CACHE_KEY, JSON.stringify(responsePayload), "EX", HERO_CACHE_TTL);
 
     return res.status(200).json({
-        success:true,
-        message:"Hero sections fetched successfully",
-        ...responsePayload
-    })
+        success: true,
+        message: "Active hero sections fetched successfully",
+        ...responsePayload,
+    });
+});
 
-})
-
+// ─── GET BY ID (Admin) ────────────────────────────────────────────────────────
 export const getHeroSectionById = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     if (!id) throw new ApiError(400, "Id is required");
@@ -182,6 +199,7 @@ export const getHeroSectionById = asyncHandler(async (req: Request, res: Respons
     });
 });
 
+// ─── UPDATE ───────────────────────────────────────────────────────────────────
 export const updateHeroSection = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     if (!id) throw new ApiError(400, "Id is required");
@@ -197,7 +215,7 @@ export const updateHeroSection = asyncHandler(async (req: Request, res: Response
         isActive, order,
     } = req.body;
 
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
 
     if (eyebrow !== undefined)             updateData.eyebrow             = eyebrow.trim();
     if (brandName !== undefined)           updateData.brandName           = brandName.trim();
@@ -211,7 +229,7 @@ export const updateHeroSection = asyncHandler(async (req: Request, res: Response
     if (textAlignment !== undefined)       updateData.textAlignment       = textAlignment;
     if (overlayColor !== undefined)        updateData.overlayColor        = overlayColor;
     if (overlayOpacity !== undefined)      updateData.overlayOpacity      = Number(overlayOpacity);
-    if (isActive !== undefined)            updateData.isActive            = JSON.parse(String(isActive));
+    if (isActive !== undefined)            updateData.isActive            = parseBoolean(isActive, existing.isActive);
 
     if (order !== undefined) {
         const requestedOrder = Number(order);
@@ -234,7 +252,7 @@ export const updateHeroSection = asyncHandler(async (req: Request, res: Response
 
         updateData.mediaType      = newMediaType;
         updateData.mediaUrl       = uploaded.cloudinaryUrl || uploaded.localUrl;
-        updateData.mediaPublicId  = uploaded.cloudinaryPublicId;
+        updateData.mediaPublicId  = uploaded.cloudinaryPublicId || "";
         updateData.mediaLocalPath = uploaded.localPath;
         updateData.mediaLocalUrl  = uploaded.localUrl;
     }
@@ -242,17 +260,24 @@ export const updateHeroSection = asyncHandler(async (req: Request, res: Response
     const updated = await HeroSection.findByIdAndUpdate(id, updateData, {
         new: true,
         runValidators: true,
-    });
+    }).select("-mediaPublicId -mediaLocalPath");
 
-    await redisClient.del(HERO_CACHE_KEY);
+    await invalidateHeroCache();
+
+    if (!updated) throw new ApiError(404, "Hero section not found");
+    const data = updated.toObject();
 
     return res.status(200).json({
         success: true,
         message: "Hero section updated successfully",
-        data: updated,
+        data: ImageResolver.prepare({
+            ...data,
+            mediaUrl: await ImageResolver.resolveSingle(data.mediaUrl, data.mediaLocalUrl),
+        }),
     });
 });
 
+// ─── DELETE ───────────────────────────────────────────────────────────────────
 export const deleteHeroSection = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     if (!id) throw new ApiError(400, "Id is required");
@@ -267,7 +292,7 @@ export const deleteHeroSection = asyncHandler(async (req: Request, res: Response
     );
 
     await HeroSection.findByIdAndDelete(id);
-    await redisClient.del(HERO_CACHE_KEY);
+    await invalidateHeroCache();
 
     const remaining = await HeroSection.countDocuments();
 
@@ -283,6 +308,7 @@ export const deleteHeroSection = asyncHandler(async (req: Request, res: Response
     });
 });
 
+// ─── TOGGLE ACTIVE ───────────────────────────────────────────────────────────
 export const toggleHeroSectionActive = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     if (!id) throw new ApiError(400, "Id is required");
@@ -296,7 +322,7 @@ export const toggleHeroSectionActive = asyncHandler(async (req: Request, res: Re
         { new: true }
     );
 
-    await redisClient.del(HERO_CACHE_KEY);
+    await invalidateHeroCache();
 
     return res.status(200).json({
         success: true,
