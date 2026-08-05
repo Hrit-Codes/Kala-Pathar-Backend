@@ -52,7 +52,7 @@ export const createAboutUs = asyncHandler(async (req: Request, res: Response) =>
         tagline: tagline.trim(),
         description: description.trim(),
         heroImage: uploadedHeroImage.cloudinaryUrl || uploadedHeroImage.localUrl,
-        heroImagePublicId: uploadedHeroImage.cloudinaryPublicId,
+        heroImagePublicId: uploadedHeroImage.cloudinaryPublicId || "",
         heroImageLocalPath: uploadedHeroImage.localPath,
         heroImageLocalUrl: uploadedHeroImage.localUrl,
         ceoQuote: {
@@ -209,7 +209,7 @@ export const updateAboutUs = asyncHandler(async (req: Request, res: Response) =>
     const updatedAboutUs = await AboutUs.findByIdAndUpdate(
         existing._id,
         updateData,
-        { returnDocument: "after", runValidators: true }
+        { new : true, runValidators: true }
     ).select(
         "-heroImagePublicId -heroImageLocalPath -ceoQuote.ceoPhotoPublicId -ceoQuote.ceoPhotoLocalPath"
     );
