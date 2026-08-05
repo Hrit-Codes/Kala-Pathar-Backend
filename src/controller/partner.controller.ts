@@ -7,9 +7,10 @@ import { ImageResolver } from "../utils/imageResolver";
 import { redisClient } from "../config/redis";
 
 const MAX_AFFILIATIONS = 5;
-const PARTNER_CACHE_KEY="partner:section";
-const PARTNER_CACHE_TTL=30*60;
+const PARTNER_CACHE_KEY = "partner:section";
+const PARTNER_CACHE_TTL = 30 * 60;
 
+// ─── CREATE PARTNER SECTION ───────────────────────────────────────────────────
 export const createPartnerSection = asyncHandler(async (req: Request, res: Response) => {
     const existing = await PartnerSection.findOne();
     if (existing) {
@@ -17,7 +18,11 @@ export const createPartnerSection = asyncHandler(async (req: Request, res: Respo
     }
 
     const { sectionTitle, sectionTagline, badges } = req.body;
-    const parsedBadges = typeof badges === "string" ? JSON.parse(badges) : badges ?? [];
+    const parsedBadges = typeof badges === "string" ? JSON.parse(badges) : badges;
+
+    if (!Array.isArray(parsedBadges) || parsedBadges.length < 2 || parsedBadges.length > 6) {
+        throw new ApiError(400, "Between 2 and 6 badges are required");
+    }
 
     const partnerSection = await PartnerSection.create({
         sectionTitle: sectionTitle.trim(),
@@ -35,15 +40,16 @@ export const createPartnerSection = asyncHandler(async (req: Request, res: Respo
     });
 });
 
+// ─── GET PARTNER SECTION ─────────────────────────────────────────────────────
 export const getPartnerSection = asyncHandler(async (req: Request, res: Response) => {
-    const cached= await redisClient.get(PARTNER_CACHE_KEY);
+    const cached = await redisClient.get(PARTNER_CACHE_KEY);
 
-    if(cached){
+    if (cached) {
         return res.status(200).json({
-            success:true,
-            message:"Partner section fetched successfully",
-            data:JSON.parse(cached),
-        })
+            success: true,
+            message: "Partner section fetched successfully",
+            data: JSON.parse(cached),
+        });
     }
 
     const partnerSection = await PartnerSection.findOne().select(
@@ -56,25 +62,30 @@ export const getPartnerSection = asyncHandler(async (req: Request, res: Response
 
     const data = partnerSection.toObject();
 
-    const resolved= ImageResolver.prepare({
+    const resolved = ImageResolver.prepare({
         ...data,
-        affiliations:await ImageResolver.resolveSubdocumentArray(data.affiliations,"logo","logoLocalUrl"),
-    })
+        affiliations: await ImageResolver.resolveSubdocumentArray(
+            data.affiliations,
+            "logo",
+            "logoLocalUrl"
+        ),
+    });
 
     await redisClient.set(
         PARTNER_CACHE_KEY,
         JSON.stringify(resolved),
         "EX",
         PARTNER_CACHE_TTL
-    )
+    );
 
     return res.status(200).json({
         success: true,
         message: "Partner section fetched successfully",
-        data: resolved
+        data: resolved,
     });
 });
 
+// ─── UPDATE PARTNER SECTION ───────────────────────────────────────────────────
 export const updatePartnerSection = asyncHandler(async (req: Request, res: Response) => {
     const existing = await PartnerSection.findOne();
     if (!existing) {
@@ -82,15 +93,15 @@ export const updatePartnerSection = asyncHandler(async (req: Request, res: Respo
     }
 
     const { sectionTitle, sectionTagline, badges } = req.body;
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
 
-    if (sectionTitle) updateData.sectionTitle = sectionTitle.trim();
-    if (sectionTagline) updateData.sectionTagline = sectionTagline.trim();
+    if (sectionTitle !== undefined) updateData.sectionTitle = sectionTitle.trim();
+    if (sectionTagline !== undefined) updateData.sectionTagline = sectionTagline.trim();
 
     if (badges !== undefined) {
         const parsedBadges = typeof badges === "string" ? JSON.parse(badges) : badges;
-        if (!Array.isArray(parsedBadges)) {
-            throw new ApiError(400, "Badges must be an array of strings");
+        if (!Array.isArray(parsedBadges) || parsedBadges.length < 2 || parsedBadges.length > 6) {
+            throw new ApiError(400, "Between 2 and 6 badges are required");
         }
         updateData.badges = parsedBadges;
     }
@@ -100,7 +111,7 @@ export const updatePartnerSection = asyncHandler(async (req: Request, res: Respo
     const updated = await PartnerSection.findByIdAndUpdate(
         existing._id,
         updateData,
-        { returnDocument: "after", runValidators: true }
+        { new: true, runValidators: true }
     );
 
     await redisClient.del(PARTNER_CACHE_KEY);
@@ -114,6 +125,7 @@ export const updatePartnerSection = asyncHandler(async (req: Request, res: Respo
     });
 });
 
+// ─── ADD AFFILIATION ──────────────────────────────────────────────────────────
 export const addAffiliation = asyncHandler(async (req: Request, res: Response) => {
     const existing = await PartnerSection.findOne();
     if (!existing) {
@@ -139,16 +151,16 @@ export const addAffiliation = asyncHandler(async (req: Request, res: Response) =
         abbreviation: abbreviation.trim(),
         name: name.trim(),
         logo: uploadedLogo.cloudinaryUrl || uploadedLogo.localUrl,
-        logoPublicId: uploadedLogo.cloudinaryPublicId,
+        logoPublicId: uploadedLogo.cloudinaryPublicId || "",
         logoLocalPath: uploadedLogo.localPath,
         logoLocalUrl: uploadedLogo.localUrl,
-        order: order ?? existing.affiliations.length,
+        order: order !== undefined ? Number(order) : existing.affiliations.length,
     };
 
     const updated = await PartnerSection.findByIdAndUpdate(
         existing._id,
         { $push: { affiliations: newAffiliation } },
-        { returnDocument: "after", runValidators: true }
+        { new: true, runValidators: true }
     );
 
     await redisClient.del(PARTNER_CACHE_KEY);
@@ -163,6 +175,7 @@ export const addAffiliation = asyncHandler(async (req: Request, res: Response) =
     });
 });
 
+// ─── UPDATE AFFILIATION ───────────────────────────────────────────────────────
 export const updateAffiliation = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     if (!id) throw new ApiError(400, "Affiliation id is required");
@@ -171,17 +184,17 @@ export const updateAffiliation = asyncHandler(async (req: Request, res: Response
     if (!existing) throw new ApiError(404, "Affiliation item not found");
 
     const { abbreviation, name, order } = req.body;
-    const affiliationUpdate: any = {};
+    const affiliationUpdate: Record<string, unknown> = {};
 
-    if (abbreviation) affiliationUpdate["affiliations.$.abbreviation"] = abbreviation.trim();
-    if (name) affiliationUpdate["affiliations.$.name"] = name.trim();
-    if (order !== undefined) affiliationUpdate["affiliations.$.order"] = order;
+    if (abbreviation !== undefined) affiliationUpdate["affiliations.$.abbreviation"] = abbreviation.trim();
+    if (name !== undefined) affiliationUpdate["affiliations.$.name"] = name.trim();
+    if (order !== undefined) affiliationUpdate["affiliations.$.order"] = Number(order);
 
     if (req.file) {
         const uploadedLogo = await uploadImageToCloud(req.file, "affiliations");
 
         affiliationUpdate["affiliations.$.logo"] = uploadedLogo.cloudinaryUrl || uploadedLogo.localUrl;
-        affiliationUpdate["affiliations.$.logoPublicId"] = uploadedLogo.cloudinaryPublicId;
+        affiliationUpdate["affiliations.$.logoPublicId"] = uploadedLogo.cloudinaryPublicId || "";
         affiliationUpdate["affiliations.$.logoLocalPath"] = uploadedLogo.localPath;
         affiliationUpdate["affiliations.$.logoLocalUrl"] = uploadedLogo.localUrl;
 
@@ -201,7 +214,7 @@ export const updateAffiliation = asyncHandler(async (req: Request, res: Response
     const updated = await PartnerSection.findOneAndUpdate(
         { "affiliations._id": id },
         { $set: affiliationUpdate },
-        { returnDocument: "after", runValidators: true }
+        { new: true, runValidators: true }
     );
 
     await redisClient.del(PARTNER_CACHE_KEY);
@@ -217,6 +230,7 @@ export const updateAffiliation = asyncHandler(async (req: Request, res: Response
     });
 });
 
+// ─── DELETE AFFILIATION ───────────────────────────────────────────────────────
 export const deleteAffiliation = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     if (!id) throw new ApiError(400, "Affiliation ID is required");
@@ -239,7 +253,7 @@ export const deleteAffiliation = asyncHandler(async (req: Request, res: Response
     const updated = await PartnerSection.findByIdAndUpdate(
         existing._id,
         { $pull: { affiliations: { _id: id } } },
-        { returnDocument: "after" }
+        { new: true }
     );
 
     await redisClient.del(PARTNER_CACHE_KEY);
