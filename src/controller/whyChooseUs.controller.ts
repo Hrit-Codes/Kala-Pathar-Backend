@@ -1,4 +1,4 @@
-import { response, type Request, type Response } from "express";
+import { type Request, type Response } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { ApiError } from "../utils/apiError";
 import { WhyChooseUs } from "../model/whyChooseUs.model";
@@ -32,7 +32,7 @@ export const createWhyChooseUs = asyncHandler(async (req: Request, res: Response
 
     await redisClient.del(WHY_CHOOSE_US_CACHE_KEY);
 
-    return res.status(200).json({
+    return res.status(201).json({
         success: true,
         message: "Why Choose Us entry created successfully",
         data: whyChooseUs
