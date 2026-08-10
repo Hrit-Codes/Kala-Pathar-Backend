@@ -1,53 +1,71 @@
-# docker-compose.yml
-# ✅ Remove this line: version: "3.9"
-
 services:
-  # Backend Service
   backend:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: kala-pathar-backend
     ports:
-      - "5010:5010"
+      - "5000:5000"
     env_file:
-      - .env.production
+      - ./.env.production
     environment:
-      - NODE_ENV=production
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - REDIS_URL=redis://redis:6379
-      - PORT=5010
+      - NODE_ENV=production
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
+      mongo:
+        condition: service_healthy
       redis:
         condition: service_healthy
     restart: unless-stopped
-    volumes:
-      - ./logs:/app/logs
-      - ./uploads:/app/uploads
     networks:
-      - kala-network
+      - kala-pathar-network
 
-  # Redis Service
+  mongo:
+    image: mongo:7.0
+    container_name: kala-pathar-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_ROOT_DATABASE: ${MONGO_DB_NAME}
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    networks:
+      - kala-pathar-network
+
   redis:
-    image: redis:alpine
-    container_name: redis
+    image: redis:7-alpine
+    container_name: kala-pathar-redis
+    restart: unless-stopped
     ports:
       - "6381:6379"
-    restart: unless-stopped
+    volumes:
+      - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     networks:
-      - kala-network
-    volumes:
-      - redis-data:/data
+      - kala-pathar-network
 
-# Volumes for persistent data
 volumes:
-  redis-data:
+  mongo_data:
+  redis_data:
+  uploads_data:
 
-# Network for service communication
 networks:
-  kala-network:
+  kala-pathar-network:
     driver: bridge
